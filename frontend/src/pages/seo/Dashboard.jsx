@@ -3,6 +3,95 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { apiGet, apiPost } from '../../api'
 import { useToast } from '../../ui/Toast'
 
+// Premium Minimalistic Icons
+const Icons = {
+  overview: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+  meta: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+  ),
+  pixels: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+    </svg>
+  ),
+  analytics: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  ),
+  globe: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  ),
+  product: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+    </svg>
+  ),
+  schema: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+    </svg>
+  ),
+  settings: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  ),
+  check: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  x: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  search: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  ),
+}
+
+// Premium Design Tokens
+const theme = {
+  colors: {
+    bg: '#fafafa',
+    card: '#ffffff',
+    border: '#f0f0f0',
+    borderHover: '#e0e0e0',
+    text: '#111111',
+    textSecondary: '#666666',
+    textMuted: '#999999',
+    primary: '#000000',
+    primaryHover: '#333333',
+    success: '#10b981',
+    warning: '#f59e0b',
+    error: '#ef4444',
+    accent: '#6366f1',
+  },
+  radius: {
+    sm: '6px',
+    md: '10px',
+    lg: '14px',
+    xl: '20px',
+  },
+  shadow: {
+    sm: '0 1px 2px rgba(0,0,0,0.04)',
+    md: '0 4px 12px rgba(0,0,0,0.05)',
+    lg: '0 8px 30px rgba(0,0,0,0.08)',
+  },
+}
+
 export default function SEODashboard() {
   const toast = useToast()
   const location = useLocation()
@@ -10,7 +99,6 @@ export default function SEODashboard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   
-  // Map URL paths to tab IDs
   const getTabFromPath = (pathname) => {
     if (pathname.includes('meta-tags')) return 'meta'
     if (pathname.includes('pixels')) return 'pixels'
@@ -149,14 +237,14 @@ export default function SEODashboard() {
   }
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'meta', label: 'Meta Tags', icon: '🏷️' },
-    { id: 'pixels', label: 'Pixels', icon: '🎯' },
-    { id: 'analytics', label: 'Analytics', icon: '📈' },
-    { id: 'countries', label: 'Country SEO', icon: '🌍' },
-    { id: 'products', label: 'Product SEO', icon: '📦' },
-    { id: 'schema', label: 'Schema', icon: '🔗' },
-    { id: 'advanced', label: 'Advanced', icon: '⚙️' },
+    { id: 'overview', label: 'Overview', icon: Icons.overview },
+    { id: 'meta', label: 'Meta Tags', icon: Icons.meta },
+    { id: 'pixels', label: 'Pixels', icon: Icons.pixels },
+    { id: 'analytics', label: 'Analytics', icon: Icons.analytics },
+    { id: 'countries', label: 'Country SEO', icon: Icons.globe },
+    { id: 'products', label: 'Product SEO', icon: Icons.product },
+    { id: 'schema', label: 'Schema', icon: Icons.schema },
+    { id: 'advanced', label: 'Advanced', icon: Icons.settings },
   ]
 
   async function saveCountrySeo(country, data) {
@@ -197,143 +285,203 @@ export default function SEODashboard() {
 
   const inputStyle = {
     width: '100%',
-    padding: '12px 14px',
-    border: '1px solid #e2e8f0',
-    borderRadius: 8,
-    fontSize: 14,
-    transition: 'border-color 0.2s',
+    padding: '14px 16px',
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radius.md,
+    fontSize: '14px',
+    fontWeight: 400,
+    color: theme.colors.text,
+    background: theme.colors.card,
+    transition: 'all 0.2s ease',
     outline: 'none',
   }
 
   const labelStyle = {
     display: 'block',
-    marginBottom: 8,
-    fontWeight: 600,
-    color: '#374151',
-    fontSize: 14,
+    marginBottom: '10px',
+    fontWeight: 500,
+    color: theme.colors.text,
+    fontSize: '13px',
+    letterSpacing: '-0.01em',
   }
 
   const helpTextStyle = {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 6,
+    fontSize: '12px',
+    color: theme.colors.textMuted,
+    marginTop: '8px',
+    lineHeight: 1.5,
   }
 
   const cardStyle = {
-    background: 'white',
-    borderRadius: 12,
-    padding: 24,
-    border: '1px solid #e2e8f0',
-    marginBottom: 20,
+    background: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    padding: '28px',
+    border: `1px solid ${theme.colors.border}`,
+    marginBottom: '20px',
+    boxShadow: theme.shadow.sm,
   }
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: '#64748b' }}>
-          <div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div>
-          Loading SEO Settings...
+      <div style={{ minHeight: '100vh', background: theme.colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            width: 40, height: 40, 
+            border: `2px solid ${theme.colors.border}`,
+            borderTopColor: theme.colors.text,
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 16px'
+          }}/>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: 500 }}>Loading...</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Header */}
+    <div style={{ minHeight: '100vh', background: theme.colors.bg }}>
+      {/* Premium Header */}
       <div style={{ 
-        background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', 
-        padding: '24px 32px',
-        color: 'white',
+        background: theme.colors.card,
+        borderBottom: `1px solid ${theme.colors.border}`,
+        padding: '32px 40px',
       }}>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>🎯 SEO Command Center</h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.9 }}>Complete SEO management - Meta tags, pixels, country & product optimization</p>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+          <h1 style={{ 
+            margin: 0, 
+            fontSize: '28px', 
+            fontWeight: 600, 
+            color: theme.colors.text,
+            letterSpacing: '-0.02em'
+          }}>
+            SEO Settings
+          </h1>
+          <p style={{ 
+            margin: '8px 0 0', 
+            color: theme.colors.textSecondary,
+            fontSize: '14px'
+          }}>
+            Manage meta tags, tracking pixels, and search optimization
+          </p>
+        </div>
       </div>
 
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
-        {/* Tabs */}
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 40px' }}>
+        {/* Premium Tabs */}
         <div style={{ 
           display: 'flex', 
-          gap: 4, 
-          marginBottom: 24,
-          background: 'white',
-          padding: 6,
-          borderRadius: 12,
-          border: '1px solid #e2e8f0',
+          gap: '4px', 
+          marginBottom: '32px',
+          background: theme.colors.card,
+          padding: '6px',
+          borderRadius: theme.radius.lg,
+          border: `1px solid ${theme.colors.border}`,
           overflowX: 'auto',
+          boxShadow: theme.shadow.sm,
         }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '10px 16px',
-                border: 'none',
-                borderRadius: 8,
-                background: activeTab === tab.id ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : 'transparent',
-                color: activeTab === tab.id ? 'white' : '#64748b',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap',
-                fontSize: 13,
-              }}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
+          {tabs.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '12px 18px',
+                  border: 'none',
+                  borderRadius: theme.radius.md,
+                  background: activeTab === tab.id ? theme.colors.text : 'transparent',
+                  color: activeTab === tab.id ? '#fff' : theme.colors.textSecondary,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  fontSize: '13px',
+                }}
+              >
+                <Icon />
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
         </div>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div>
-            {/* Stats Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-              <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white' }}>
-                <div style={{ fontSize: 32, fontWeight: 700 }}>{seoStats.pixelsActive}</div>
-                <div style={{ opacity: 0.9 }}>Active Pixels</div>
-              </div>
-              <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
-                <div style={{ fontSize: 32, fontWeight: 700 }}>{seoStats.countriesConfigured}</div>
-                <div style={{ opacity: 0.9 }}>Countries Configured</div>
-              </div>
-              <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
-                <div style={{ fontSize: 32, fontWeight: 700 }}>{seoStats.productsWithSeo}/{seoStats.totalProducts}</div>
-                <div style={{ opacity: 0.9 }}>Products with SEO</div>
-              </div>
-              <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white' }}>
-                <div style={{ fontSize: 32, fontWeight: 700 }}>{seo.structuredData ? '✓' : '✗'}</div>
-                <div style={{ opacity: 0.9 }}>Schema Markup</div>
-              </div>
+            {/* Premium Stats Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+              {[
+                { value: seoStats.pixelsActive, label: 'Active Pixels', color: theme.colors.text },
+                { value: seoStats.countriesConfigured, label: 'Countries', color: theme.colors.success },
+                { value: `${seoStats.productsWithSeo}/${seoStats.totalProducts}`, label: 'Products with SEO', color: theme.colors.warning },
+                { value: seo.structuredData ? '✓' : '—', label: 'Schema', color: theme.colors.accent },
+              ].map((stat, i) => (
+                <div key={i} style={{
+                  ...cardStyle,
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}>
+                  <div style={{ 
+                    fontSize: '32px', 
+                    fontWeight: 600, 
+                    color: stat.color,
+                    letterSpacing: '-0.02em'
+                  }}>{stat.value}</div>
+                  <div style={{ 
+                    fontSize: '13px',
+                    color: theme.colors.textSecondary,
+                    fontWeight: 500
+                  }}>{stat.label}</div>
+                </div>
+              ))}
             </div>
 
-            {/* Quick Status */}
+            {/* SEO Health Check */}
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b' }}>🚀 SEO Health Check</h3>
-              <div style={{ display: 'grid', gap: 12 }}>
+              <h3 style={{ 
+                margin: '0 0 24px', 
+                color: theme.colors.text, 
+                fontSize: '16px', 
+                fontWeight: 600,
+                letterSpacing: '-0.01em'
+              }}>
+                Health Check
+              </h3>
+              <div style={{ display: 'grid', gap: '8px' }}>
                 {[
-                  { label: 'Site Title', value: seo.siteTitle, status: seo.siteTitle ? 'good' : 'missing' },
-                  { label: 'Site Description', value: seo.siteDescription, status: seo.siteDescription ? 'good' : 'missing' },
-                  { label: 'Google Analytics', value: seo.googleAnalytics, status: seo.googleAnalytics ? 'good' : 'missing' },
-                  { label: 'Facebook Pixel', value: seo.facebookPixel, status: seo.facebookPixel ? 'good' : 'optional' },
-                  { label: 'TikTok Pixel', value: seo.tiktokPixel, status: seo.tiktokPixel ? 'good' : 'optional' },
-                  { label: 'Schema Markup', value: seo.structuredData, status: seo.structuredData ? 'good' : 'warning' },
+                  { label: 'Site Title', status: seo.siteTitle ? 'configured' : 'missing' },
+                  { label: 'Site Description', status: seo.siteDescription ? 'configured' : 'missing' },
+                  { label: 'Google Analytics', status: seo.googleAnalytics ? 'configured' : 'missing' },
+                  { label: 'Facebook Pixel', status: seo.facebookPixel ? 'configured' : 'optional' },
+                  { label: 'TikTok Pixel', status: seo.tiktokPixel ? 'configured' : 'optional' },
+                  { label: 'Schema Markup', status: seo.structuredData ? 'configured' : 'warning' },
                 ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: 8 }}>
-                    <span style={{ fontWeight: 500 }}>{item.label}</span>
+                  <div key={i} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '14px 18px', 
+                    background: theme.colors.bg, 
+                    borderRadius: theme.radius.md,
+                    border: `1px solid ${theme.colors.border}`
+                  }}>
+                    <span style={{ fontWeight: 500, fontSize: '14px', color: theme.colors.text }}>{item.label}</span>
                     <span style={{ 
-                      padding: '4px 12px', 
-                      borderRadius: 20, 
-                      fontSize: 12, 
-                      fontWeight: 600,
-                      background: item.status === 'good' ? '#dcfce7' : item.status === 'missing' ? '#fee2e2' : '#fef3c7',
-                      color: item.status === 'good' ? '#166534' : item.status === 'missing' ? '#991b1b' : '#92400e',
+                      padding: '5px 12px', 
+                      borderRadius: '20px', 
+                      fontSize: '12px', 
+                      fontWeight: 500,
+                      background: item.status === 'configured' ? '#ecfdf5' : item.status === 'missing' ? '#fef2f2' : '#fffbeb',
+                      color: item.status === 'configured' ? '#059669' : item.status === 'missing' ? '#dc2626' : '#d97706',
                     }}>
-                      {item.status === 'good' ? '✓ Configured' : item.status === 'missing' ? '✗ Missing' : '○ Optional'}
+                      {item.status === 'configured' ? 'Configured' : item.status === 'missing' ? 'Missing' : 'Optional'}
                     </span>
                   </div>
                 ))}
@@ -341,32 +489,45 @@ export default function SEODashboard() {
             </div>
 
             {/* Quick Actions */}
-            <div style={{ ...cardStyle, marginTop: 20 }}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b' }}>⚡ Quick Actions</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div style={{ ...cardStyle, marginTop: '20px' }}>
+              <h3 style={{ 
+                margin: '0 0 24px', 
+                color: theme.colors.text, 
+                fontSize: '16px', 
+                fontWeight: 600,
+                letterSpacing: '-0.01em'
+              }}>
+                Quick Actions
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
                 {[
-                  { label: 'Setup Meta Tags', tab: 'meta', icon: '🏷️' },
-                  { label: 'Configure Pixels', tab: 'pixels', icon: '🎯' },
-                  { label: 'Country SEO', tab: 'countries', icon: '🌍' },
-                  { label: 'Product SEO', tab: 'products', icon: '📦' },
-                ].map((action, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveTab(action.tab)}
-                    style={{
-                      padding: 16,
-                      border: '2px dashed #e2e8f0',
-                      borderRadius: 12,
-                      background: 'white',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>{action.icon}</div>
-                    <div style={{ fontWeight: 600, color: '#374151' }}>{action.label}</div>
-                  </button>
-                ))}
+                  { label: 'Meta Tags', tab: 'meta', icon: Icons.meta },
+                  { label: 'Pixels', tab: 'pixels', icon: Icons.pixels },
+                  { label: 'Countries', tab: 'countries', icon: Icons.globe },
+                  { label: 'Products', tab: 'products', icon: Icons.product },
+                ].map((action, i) => {
+                  const ActionIcon = action.icon
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setActiveTab(action.tab)}
+                      style={{
+                        padding: '20px',
+                        border: `1px solid ${theme.colors.border}`,
+                        borderRadius: theme.radius.md,
+                        background: theme.colors.card,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = theme.colors.borderHover}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = theme.colors.border}
+                    >
+                      <div style={{ marginBottom: '10px', color: theme.colors.textSecondary }}><ActionIcon /></div>
+                      <div style={{ fontWeight: 500, color: theme.colors.text, fontSize: '13px' }}>{action.label}</div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -376,8 +537,8 @@ export default function SEODashboard() {
         {activeTab === 'meta' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🏷️</span> Basic Meta Tags
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Basic Meta Tags
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -419,8 +580,8 @@ export default function SEODashboard() {
             </div>
 
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🖼️</span> Open Graph / Social Media
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Open Graph / Social Media
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -456,16 +617,17 @@ export default function SEODashboard() {
         {activeTab === 'pixels' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📱</span> Social Media Pixels
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Social Media Pixels
               </h3>
               
-              <div style={{ display: 'grid', gap: 20 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div style={{ display: 'grid', gap: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#1877f2' }}>●</span> Facebook/Meta Pixel ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1877f2' }}></span>
+                        Facebook/Meta Pixel
                       </span>
                     </label>
                     <input
@@ -475,13 +637,14 @@ export default function SEODashboard() {
                       style={inputStyle}
                       placeholder="123456789012345"
                     />
-                    <p style={helpTextStyle}>Find in Meta Events Manager → Data Sources</p>
+                    <p style={helpTextStyle}>Meta Events Manager → Data Sources</p>
                   </div>
 
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#000' }}>●</span> TikTok Pixel ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
+                        TikTok Pixel
                       </span>
                     </label>
                     <input
@@ -489,17 +652,18 @@ export default function SEODashboard() {
                       value={seo.tiktokPixel}
                       onChange={e => setSeo({ ...seo, tiktokPixel: e.target.value })}
                       style={inputStyle}
-                      placeholder="CXXXXXXXXXXXXXXXXX"
+                      placeholder="D5LMN53C77U4MKNK3QS0"
                     />
-                    <p style={helpTextStyle}>Find in TikTok Ads Manager → Events</p>
+                    <p style={helpTextStyle}>TikTok Ads Manager → Events</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#fffc00' }}>●</span> Snapchat Pixel ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FFFC00' }}></span>
+                        Snapchat Pixel
                       </span>
                     </label>
                     <input
@@ -509,13 +673,14 @@ export default function SEODashboard() {
                       style={inputStyle}
                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                     />
-                    <p style={helpTextStyle}>Find in Snapchat Ads Manager → Events Manager</p>
+                    <p style={helpTextStyle}>Snapchat Ads Manager → Events Manager</p>
                   </div>
 
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#e60023' }}>●</span> Pinterest Tag ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E60023' }}></span>
+                        Pinterest Tag
                       </span>
                     </label>
                     <input
@@ -525,15 +690,16 @@ export default function SEODashboard() {
                       style={inputStyle}
                       placeholder="123456789012"
                     />
-                    <p style={helpTextStyle}>Find in Pinterest Ads → Conversions</p>
+                    <p style={helpTextStyle}>Pinterest Ads → Conversions</p>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#1da1f2' }}>●</span> Twitter/X Pixel ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
+                        Twitter/X Pixel
                       </span>
                     </label>
                     <input
@@ -543,13 +709,14 @@ export default function SEODashboard() {
                       style={inputStyle}
                       placeholder="tw-xxxxx-xxxxx"
                     />
-                    <p style={helpTextStyle}>Find in X Ads → Events Manager</p>
+                    <p style={helpTextStyle}>X Ads → Events Manager</p>
                   </div>
 
                   <div>
                     <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ color: '#0a66c2' }}>●</span> LinkedIn Insight Tag ID
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0A66C2' }}></span>
+                        LinkedIn Insight Tag
                       </span>
                     </label>
                     <input
@@ -559,7 +726,7 @@ export default function SEODashboard() {
                       style={inputStyle}
                       placeholder="1234567"
                     />
-                    <p style={helpTextStyle}>Find in LinkedIn Campaign Manager → Insight Tag</p>
+                    <p style={helpTextStyle}>LinkedIn Campaign Manager → Insight Tag</p>
                   </div>
                 </div>
               </div>
@@ -567,16 +734,30 @@ export default function SEODashboard() {
 
             <div style={{ 
               ...cardStyle, 
-              background: 'linear-gradient(135deg, #fef3c7, #fde68a)', 
-              border: '1px solid #fbbf24' 
+              background: '#fffbeb',
+              border: `1px solid #fde68a`,
             }}>
-              <h4 style={{ margin: '0 0 12px', color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>💡</span> Pro Tip
-              </h4>
-              <p style={{ margin: 0, color: '#78350f', fontSize: 14 }}>
-                Make sure to test your pixels using browser extensions like Meta Pixel Helper, TikTok Pixel Helper, 
-                or the respective platform's debugging tools before going live.
-              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{ 
+                  width: 32, height: 32, 
+                  borderRadius: '8px', 
+                  background: '#fef3c7', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 6px', color: '#92400e', fontSize: '14px', fontWeight: 600 }}>Testing Tip</h4>
+                  <p style={{ margin: 0, color: '#a16207', fontSize: '13px', lineHeight: 1.5 }}>
+                    Use browser extensions like Meta Pixel Helper or TikTok Pixel Helper to verify your pixels are firing correctly.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -585,8 +766,8 @@ export default function SEODashboard() {
         {activeTab === 'analytics' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📊</span> Google Analytics & Tag Manager
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Google Analytics & Tag Manager
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -617,8 +798,8 @@ export default function SEODashboard() {
             </div>
 
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🔥</span> Heatmaps & Session Recording
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Heatmaps & Session Recording
               </h3>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -654,10 +835,10 @@ export default function SEODashboard() {
         {activeTab === 'countries' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🌍</span> Country-Specific SEO Settings
+              <h3 style={{ margin: '0 0 8px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Country-Specific SEO
               </h3>
-              <p style={helpTextStyle}>Configure unique SEO settings, meta tags, and tracking pixels for each country.</p>
+              <p style={{ ...helpTextStyle, marginTop: 0, marginBottom: '24px' }}>Configure unique settings for each country.</p>
               
               <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: 24, marginTop: 20 }}>
                 {/* Country List */}
@@ -808,8 +989,8 @@ export default function SEODashboard() {
         {activeTab === 'products' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📦</span> Product-Level SEO Optimization
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Product SEO
               </h3>
               
               {/* Search */}
@@ -978,8 +1159,8 @@ export default function SEODashboard() {
         {activeTab === 'schema' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🔗</span> Schema Markup (Structured Data)
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Schema Markup
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -1098,8 +1279,8 @@ export default function SEODashboard() {
         {activeTab === 'advanced' && (
           <div>
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>💻</span> Custom Code Injection
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Custom Code Injection
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -1128,8 +1309,8 @@ export default function SEODashboard() {
             </div>
 
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 20px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🤖</span> Robots & Crawlers
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Robots & Crawlers
               </h3>
               
               <div style={{ display: 'grid', gap: 20 }}>
@@ -1161,58 +1342,69 @@ export default function SEODashboard() {
           </div>
         )}
 
-        {/* Save Button */}
+        {/* Premium Save Button */}
         <div style={{ 
           position: 'sticky', 
-          bottom: 24, 
-          background: 'white', 
-          padding: 16, 
-          borderRadius: 12,
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+          bottom: '24px', 
+          background: theme.colors.card, 
+          padding: '16px 20px', 
+          borderRadius: theme.radius.lg,
+          border: `1px solid ${theme.colors.border}`,
+          boxShadow: theme.shadow.lg,
           display: 'flex',
           justifyContent: 'flex-end',
-          gap: 12,
+          gap: '12px',
         }}>
           <button
             onClick={loadSEOSettings}
             style={{
-              padding: '12px 24px',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              background: 'white',
-              color: '#64748b',
-              fontWeight: 600,
+              padding: '12px 20px',
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.md,
+              background: theme.colors.card,
+              color: theme.colors.textSecondary,
+              fontWeight: 500,
+              fontSize: '14px',
               cursor: 'pointer',
+              transition: 'all 0.15s ease',
             }}
           >
-            Reset Changes
+            Reset
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             style={{
-              padding: '12px 32px',
+              padding: '12px 24px',
               border: 'none',
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-              color: 'white',
-              fontWeight: 600,
+              borderRadius: theme.radius.md,
+              background: theme.colors.text,
+              color: '#fff',
+              fontWeight: 500,
+              fontSize: '14px',
               cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.7 : 1,
+              opacity: saving ? 0.6 : 1,
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: '8px',
+              transition: 'all 0.15s ease',
             }}
           >
             {saving ? (
-              <>Saving...</>
+              <>
+                <div style={{ 
+                  width: 16, height: 16, 
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }}/>
+                Saving...
+              </>
             ) : (
               <>
-                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Save All Settings
+                <Icons.check />
+                Save Changes
               </>
             )}
           </button>
