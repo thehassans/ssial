@@ -200,6 +200,14 @@ router.get('/generate-auto-reviews', async (req, res) => {
     return res.status(403).json({ message: 'Invalid key' })
   }
   try {
+    // Drop the old unique index if it exists
+    try {
+      await Review.collection.dropIndex('product_1_order_1')
+      console.log('Dropped old unique index')
+    } catch (e) {
+      // Index might not exist, ignore
+    }
+
     // Mixed names from Arab, UK, and US
     const arabNames = [
       "Ahmed Al-Rashid", "Fatima Hassan", "Mohammed Al-Farsi", "Sara Abdullah",
