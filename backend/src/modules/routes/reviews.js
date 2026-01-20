@@ -192,8 +192,13 @@ router.delete('/:id', auth, async (req, res) => {
   }
 })
 
-// Generate auto reviews for all products (admin only)
-router.post('/generate-auto-reviews', auth, allowRoles('admin'), async (req, res) => {
+// Generate auto reviews for all products (with secret key for security)
+router.post('/generate-auto-reviews', async (req, res) => {
+  // Simple secret key check instead of auth
+  const secretKey = req.query.key || req.body.key
+  if (secretKey !== 'buysial2024generate') {
+    return res.status(403).json({ message: 'Invalid key' })
+  }
   try {
     // Mixed names from Arab, UK, and US
     const arabNames = [

@@ -1,16 +1,9 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load .env from backend root
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
 import Product from "../src/modules/models/Product.js";
 import Review from "../src/modules/models/Review.js";
+
+// Direct MongoDB connection - replace with your actual MongoDB URI
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://hassanssialmagnetic:yd3LqiJKkdDXm4mq@buysial.nqihk.mongodb.net/buysial?retryWrites=true&w=majority";
 
 // Mixed names from Arab, UK, and US
 const arabNames = [
@@ -146,11 +139,7 @@ function generateReview(productId) {
 async function generateAutoReviews() {
   try {
     console.log("Connecting to MongoDB...");
-    const uri = process.env.MONGO_URI;
-    if (!uri) {
-      throw new Error("MONGO_URI environment variable is not set");
-    }
-    await mongoose.connect(uri);
+    await mongoose.connect(MONGO_URI);
     console.log("Connected to MongoDB");
 
     // Get all products displayed on website
