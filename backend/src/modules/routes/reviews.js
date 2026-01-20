@@ -193,7 +193,7 @@ router.delete('/:id', auth, async (req, res) => {
 })
 
 // Generate auto reviews for all products (with secret key for security)
-router.post('/generate-auto-reviews', async (req, res) => {
+router.get('/generate-auto-reviews', async (req, res) => {
   // Simple secret key check instead of auth
   const secretKey = req.query.key || req.body.key
   if (secretKey !== 'buysial2024generate') {
