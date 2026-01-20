@@ -20,6 +20,28 @@ class Analytics {
     }
   }
 
+  // Facebook Pixel helper - safely call fbq methods
+  fbqTrack(eventName, params = {}) {
+    if (typeof window !== 'undefined' && window.fbq) {
+      try {
+        window.fbq('track', eventName, params)
+      } catch (e) {
+        console.warn('Facebook Pixel tracking error:', e)
+      }
+    }
+  }
+
+  // Snapchat Pixel helper
+  snaptrTrack(eventName, params = {}) {
+    if (typeof window !== 'undefined' && window.snaptr) {
+      try {
+        window.snaptr('track', eventName, params)
+      } catch (e) {
+        console.warn('Snapchat Pixel tracking error:', e)
+      }
+    }
+  }
+
   generateSessionId() {
     return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
   }
@@ -66,17 +88,37 @@ class Analytics {
     
     // TikTok Pixel - ViewContent event
     this.ttqTrack('ViewContent', {
-      content_id: productId,
+      content_id: String(productId),
       content_type: 'product',
       content_name: productName,
       content_category: category,
-      price: price,
+      price: Number(price) || 0,
+      currency: 'SAR'
+    })
+
+    // Facebook Pixel - ViewContent event
+    this.fbqTrack('ViewContent', {
+      content_ids: [String(productId)],
+      content_type: 'product',
+      content_name: productName,
+      content_category: category,
+      value: Number(price) || 0,
+      currency: 'SAR'
+    })
+
+    // Snapchat Pixel - VIEW_CONTENT event
+    this.snaptrTrack('VIEW_CONTENT', {
+      item_ids: [String(productId)],
+      item_category: category,
+      price: Number(price) || 0,
       currency: 'SAR'
     })
   }
 
   // Track add to cart events
   trackAddToCart(productId, productName, price, quantity = 1) {
+    const totalValue = (Number(price) || 0) * (Number(quantity) || 1)
+    
     this.trackEvent('add_to_cart', {
       product_id: productId,
       product_name: productName,
@@ -87,12 +129,28 @@ class Analytics {
     
     // TikTok Pixel - AddToCart event
     this.ttqTrack('AddToCart', {
-      content_id: productId,
+      content_id: String(productId),
       content_type: 'product',
       content_name: productName,
-      quantity: quantity,
-      price: price,
-      value: price * quantity,
+      quantity: Number(quantity) || 1,
+      price: Number(price) || 0,
+      value: totalValue,
+      currency: 'SAR'
+    })
+
+    // Facebook Pixel - AddToCart event
+    this.fbqTrack('AddToCart', {
+      content_ids: [String(productId)],
+      content_type: 'product',
+      content_name: productName,
+      value: totalValue,
+      currency: 'SAR'
+    })
+
+    // Snapchat Pixel - ADD_CART event
+    this.snaptrTrack('ADD_CART', {
+      item_ids: [String(productId)],
+      price: totalValue,
       currency: 'SAR'
     })
   }
@@ -114,30 +172,68 @@ class Analytics {
       results_count: resultsCount,
       timestamp: Date.now()
     })
+
+    // TikTok Pixel - Search event
+    this.ttqTrack('Search', {
+      query: query,
+      content_type: 'product'
+    })
+
+    // Facebook Pixel - Search event
+    this.fbqTrack('Search', {
+      search_string: query,
+      content_type: 'product'
+    })
+
+    // Snapchat Pixel - SEARCH event
+    this.snaptrTrack('SEARCH', {
+      search_string: query
+    })
   }
 
   // Track checkout events
   trackCheckoutStart(cartValue, itemCount) {
+    const value = Number(cartValue) || 0
+    const quantity = Number(itemCount) || 1
+
     this.trackEvent('checkout_start', {
-      cart_value: cartValue,
-      item_count: itemCount,
+      cart_value: value,
+      item_count: quantity,
       timestamp: Date.now()
     })
     
     // TikTok Pixel - InitiateCheckout event
     this.ttqTrack('InitiateCheckout', {
       content_type: 'product',
-      quantity: itemCount,
-      value: cartValue,
+      quantity: quantity,
+      value: value,
       currency: 'SAR'
+    })
+
+    // Facebook Pixel - InitiateCheckout event
+    this.fbqTrack('InitiateCheckout', {
+      content_type: 'product',
+      num_items: quantity,
+      value: value,
+      currency: 'SAR'
+    })
+
+    // Snapchat Pixel - START_CHECKOUT event
+    this.snaptrTrack('START_CHECKOUT', {
+      price: value,
+      currency: 'SAR',
+      number_items: quantity
     })
   }
 
   trackCheckoutComplete(orderId, cartValue, itemCount, paymentMethod) {
+    const value = Number(cartValue) || 0
+    const quantity = Number(itemCount) || 1
+
     this.trackEvent('checkout_complete', {
       order_id: orderId,
-      cart_value: cartValue,
-      item_count: itemCount,
+      cart_value: value,
+      item_count: quantity,
       payment_method: paymentMethod,
       timestamp: Date.now()
     })
@@ -145,9 +241,25 @@ class Analytics {
     // TikTok Pixel - CompletePayment event (Purchase)
     this.ttqTrack('CompletePayment', {
       content_type: 'product',
-      quantity: itemCount,
-      value: cartValue,
+      quantity: quantity,
+      value: value,
       currency: 'SAR'
+    })
+
+    // Facebook Pixel - Purchase event
+    this.fbqTrack('Purchase', {
+      content_type: 'product',
+      num_items: quantity,
+      value: value,
+      currency: 'SAR'
+    })
+
+    // Snapchat Pixel - PURCHASE event
+    this.snaptrTrack('PURCHASE', {
+      price: value,
+      currency: 'SAR',
+      transaction_id: String(orderId),
+      number_items: quantity
     })
   }
 

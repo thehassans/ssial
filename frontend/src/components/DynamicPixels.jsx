@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { apiGet } from '../api.js'
 
 /**
  * DynamicPixels - Injects tracking pixels dynamically based on SEO settings
  * This component loads pixel IDs from the backend and injects the appropriate scripts
+ * Also handles route change tracking for SPAs
  */
 export default function DynamicPixels() {
   const [loaded, setLoaded] = useState(false)
+  const [pixelsReady, setPixelsReady] = useState(false)
+  const location = useLocation()
+  const isFirstRender = useRef(true)
 
+  // Load pixels on mount
   useEffect(() => {
     if (loaded) return
     
@@ -22,6 +28,8 @@ export default function DynamicPixels() {
         // TikTok Pixel
         if (seo.tiktokPixel && seo.tiktokPixel.trim()) {
           initTikTokPixel(seo.tiktokPixel.trim())
+          // Store pixel ID for later use
+          window._tiktokPixelId = seo.tiktokPixel.trim()
         }
 
         // Facebook/Meta Pixel
@@ -70,6 +78,7 @@ export default function DynamicPixels() {
         }
 
         setLoaded(true)
+        setPixelsReady(true)
       } catch (err) {
         console.warn('Failed to load SEO settings for pixels:', err)
       }
@@ -78,7 +87,70 @@ export default function DynamicPixels() {
     return () => { alive = false }
   }, [loaded])
 
+  // Track route changes for page views (SPA navigation)
+  useEffect(() => {
+    // Skip the first render since pixels handle initial page view
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+
+    // Only track if pixels are ready
+    if (!pixelsReady) return
+
+    // Track page view on route change
+    trackAllPixelsPageView(location.pathname)
+  }, [location.pathname, pixelsReady])
+
   return null // This component doesn't render anything
+}
+
+// Track page view across all pixels on route change
+function trackAllPixelsPageView(pathname) {
+  // TikTok Pixel page view
+  if (window.ttq) {
+    try {
+      window.ttq.page()
+    } catch (e) {
+      console.warn('TikTok page tracking error:', e)
+    }
+  }
+
+  // Facebook Pixel page view
+  if (window.fbq) {
+    try {
+      window.fbq('track', 'PageView')
+    } catch (e) {
+      console.warn('Facebook page tracking error:', e)
+    }
+  }
+
+  // Snapchat Pixel page view
+  if (window.snaptr) {
+    try {
+      window.snaptr('track', 'PAGE_VIEW')
+    } catch (e) {
+      console.warn('Snapchat page tracking error:', e)
+    }
+  }
+
+  // Pinterest page view
+  if (window.pintrk) {
+    try {
+      window.pintrk('page')
+    } catch (e) {
+      console.warn('Pinterest page tracking error:', e)
+    }
+  }
+
+  // Google Analytics page view (handled automatically by react-router usually)
+  if (window.gtag) {
+    try {
+      window.gtag('event', 'page_view', { page_path: pathname })
+    } catch (e) {
+      console.warn('Google Analytics page tracking error:', e)
+    }
+  }
 }
 
 // TikTok Pixel initialization
