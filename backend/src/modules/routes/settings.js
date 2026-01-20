@@ -725,7 +725,7 @@ router.post(
 router.get("/seo", async (_req, res) => {
   try {
     const doc = await Setting.findOne({ key: "seo" }).lean();
-    const seo = (doc && doc.value) || {
+    const defaults = {
       siteTitle: "",
       siteDescription: "",
       keywords: "",
@@ -745,6 +745,52 @@ router.get("/seo", async (_req, res) => {
       customBodyCode: "",
       robotsTxt: "",
       structuredData: true,
+      tiktokEvents: {
+        pageView: true,
+        viewContent: true,
+        addToCart: true,
+        initiateCheckout: true,
+        completePayment: true,
+        search: true,
+        addToWishlist: true,
+        contact: false,
+        submitForm: false,
+        subscribe: false,
+      },
+      thankYouPage: {
+        enabled: false,
+        path: "/thank-you",
+        customTitle: "",
+        customMessage: "",
+        trackPurchase: true,
+        trackValue: true,
+        showOrderDetails: true,
+        redirectEnabled: false,
+        redirectUrl: "",
+        redirectDelay: 5,
+        conversionPixels: {
+          tiktok: true,
+          facebook: true,
+          snapchat: true,
+          pinterest: true,
+          google: true,
+        },
+      },
+    };
+    // Merge stored values with defaults
+    const stored = (doc && doc.value) || {};
+    const seo = {
+      ...defaults,
+      ...stored,
+      tiktokEvents: { ...defaults.tiktokEvents, ...(stored.tiktokEvents || {}) },
+      thankYouPage: { 
+        ...defaults.thankYouPage, 
+        ...(stored.thankYouPage || {}),
+        conversionPixels: {
+          ...defaults.thankYouPage.conversionPixels,
+          ...((stored.thankYouPage || {}).conversionPixels || {}),
+        },
+      },
     };
     res.json({ seo });
   } catch (e) {
@@ -776,6 +822,16 @@ router.post("/seo", auth, allowRoles("admin", "user", "seo_manager"), async (req
       customBodyCode,
       robotsTxt,
       structuredData,
+      tiktokEvents,
+      thankYouPage,
+      schemaType,
+      localBusiness,
+      breadcrumbs,
+      sitemapPriority,
+      sitemapFrequency,
+      canonicalUrl,
+      noIndex,
+      noFollow,
     } = req.body || {};
 
     let doc = await Setting.findOne({ key: "seo" });
@@ -803,6 +859,22 @@ router.post("/seo", auth, allowRoles("admin", "user", "seo_manager"), async (req
     if (typeof customBodyCode === "string") value.customBodyCode = customBodyCode;
     if (typeof robotsTxt === "string") value.robotsTxt = robotsTxt;
     if (typeof structuredData === "boolean") value.structuredData = structuredData;
+    
+    // TikTok Event Tracking settings
+    if (tiktokEvents && typeof tiktokEvents === "object") value.tiktokEvents = tiktokEvents;
+    
+    // Thank You Page settings
+    if (thankYouPage && typeof thankYouPage === "object") value.thankYouPage = thankYouPage;
+    
+    // Schema settings
+    if (typeof schemaType === "string") value.schemaType = schemaType;
+    if (localBusiness && typeof localBusiness === "object") value.localBusiness = localBusiness;
+    if (typeof breadcrumbs === "boolean") value.breadcrumbs = breadcrumbs;
+    if (typeof sitemapPriority === "string") value.sitemapPriority = sitemapPriority;
+    if (typeof sitemapFrequency === "string") value.sitemapFrequency = sitemapFrequency;
+    if (typeof canonicalUrl === "string") value.canonicalUrl = canonicalUrl;
+    if (typeof noIndex === "boolean") value.noIndex = noIndex;
+    if (typeof noFollow === "boolean") value.noFollow = noFollow;
 
     doc.value = value;
     doc.markModified('value');
