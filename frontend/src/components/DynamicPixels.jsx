@@ -24,12 +24,17 @@ export default function DynamicPixels() {
         if (!alive || !res?.seo) return
         
         const seo = res.seo
+        
+        // Store full SEO settings globally for access by analytics
+        window._seoSettings = seo
 
         // TikTok Pixel
         if (seo.tiktokPixel && seo.tiktokPixel.trim()) {
           initTikTokPixel(seo.tiktokPixel.trim())
-          // Store pixel ID for later use
+          // Store pixel ID and event settings for later use
           window._tiktokPixelId = seo.tiktokPixel.trim()
+          window._tiktokEvents = seo.tiktokEvents || {}
+          window._thankYouPageSettings = seo.thankYouPage || {}
         }
 
         // Facebook/Meta Pixel

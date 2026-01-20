@@ -9,9 +9,20 @@ class Analytics {
     this.pageViewDebounceMs = 500 // Debounce page views
   }
 
-  // TikTok Pixel helper - safely call ttq methods
-  ttqTrack(eventName, params = {}) {
+  // Check if TikTok event is enabled in settings
+  isTikTokEventEnabled(eventKey) {
+    const events = window._tiktokEvents || {}
+    // Default to true if not configured
+    return events[eventKey] !== false
+  }
+
+  // TikTok Pixel helper - safely call ttq methods with event checking
+  ttqTrack(eventName, params = {}, eventKey = null) {
     if (typeof window !== 'undefined' && window.ttq) {
+      // Check if this event type is enabled
+      if (eventKey && !this.isTikTokEventEnabled(eventKey)) {
+        return // Event disabled in settings
+      }
       try {
         window.ttq.track(eventName, params)
       } catch (e) {
@@ -86,7 +97,7 @@ class Analytics {
       timestamp: Date.now()
     })
     
-    // TikTok Pixel - ViewContent event
+    // TikTok Pixel - ViewContent event (checks if enabled)
     this.ttqTrack('ViewContent', {
       content_id: String(productId),
       content_type: 'product',
@@ -94,7 +105,7 @@ class Analytics {
       content_category: category,
       price: Number(price) || 0,
       currency: 'SAR'
-    })
+    }, 'viewContent')
 
     // Facebook Pixel - ViewContent event
     this.fbqTrack('ViewContent', {
@@ -127,7 +138,7 @@ class Analytics {
       timestamp: Date.now()
     })
     
-    // TikTok Pixel - AddToCart event
+    // TikTok Pixel - AddToCart event (checks if enabled)
     this.ttqTrack('AddToCart', {
       content_id: String(productId),
       content_type: 'product',
@@ -136,7 +147,7 @@ class Analytics {
       price: Number(price) || 0,
       value: totalValue,
       currency: 'SAR'
-    })
+    }, 'addToCart')
 
     // Facebook Pixel - AddToCart event
     this.fbqTrack('AddToCart', {
@@ -173,11 +184,11 @@ class Analytics {
       timestamp: Date.now()
     })
 
-    // TikTok Pixel - Search event
+    // TikTok Pixel - Search event (checks if enabled)
     this.ttqTrack('Search', {
       query: query,
       content_type: 'product'
-    })
+    }, 'search')
 
     // Facebook Pixel - Search event
     this.fbqTrack('Search', {
@@ -202,13 +213,13 @@ class Analytics {
       timestamp: Date.now()
     })
     
-    // TikTok Pixel - InitiateCheckout event
+    // TikTok Pixel - InitiateCheckout event (checks if enabled)
     this.ttqTrack('InitiateCheckout', {
       content_type: 'product',
       quantity: quantity,
       value: value,
       currency: 'SAR'
-    })
+    }, 'initiateCheckout')
 
     // Facebook Pixel - InitiateCheckout event
     this.fbqTrack('InitiateCheckout', {
@@ -238,13 +249,13 @@ class Analytics {
       timestamp: Date.now()
     })
     
-    // TikTok Pixel - CompletePayment event (Purchase)
+    // TikTok Pixel - CompletePayment event (checks if enabled)
     this.ttqTrack('CompletePayment', {
       content_type: 'product',
       quantity: quantity,
       value: value,
       currency: 'SAR'
-    })
+    }, 'completePayment')
 
     // Facebook Pixel - Purchase event
     this.fbqTrack('Purchase', {
@@ -378,6 +389,177 @@ class Analytics {
       searches: sessionEvents.filter(e => e.event_name === 'search').length
     }
   }
+
+  // Track Thank You page conversion
+  trackThankYouPageConversion(orderId, orderValue, itemCount, items = []) {
+    const settings = window._thankYouPageSettings || {}
+    const conversionPixels = settings.conversionPixels || {}
+    const value = Number(orderValue) || 0
+    const quantity = Number(itemCount) || 1
+
+    // Only track if enabled
+    if (!settings.enabled) return
+
+    // TikTok Pixel - CompletePayment for thank you page
+    if (conversionPixels.tiktok && window.ttq) {
+      try {
+        window.ttq.track('CompletePayment', {
+          content_type: 'product',
+          content_ids: items.map(i => String(i.id || i.productId)),
+          quantity: quantity,
+          value: value,
+          currency: 'SAR'
+        })
+      } catch (e) {
+        console.warn('TikTok thank you page tracking error:', e)
+      }
+    }
+
+    // Facebook Pixel - Purchase for thank you page
+    if (conversionPixels.facebook && window.fbq) {
+      try {
+        window.fbq('track', 'Purchase', {
+          content_type: 'product',
+          content_ids: items.map(i => String(i.id || i.productId)),
+          num_items: quantity,
+          value: value,
+          currency: 'SAR'
+        })
+      } catch (e) {
+        console.warn('Facebook thank you page tracking error:', e)
+      }
+    }
+
+    // Snapchat Pixel - PURCHASE for thank you page
+    if (conversionPixels.snapchat && window.snaptr) {
+      try {
+        window.snaptr('track', 'PURCHASE', {
+          item_ids: items.map(i => String(i.id || i.productId)),
+          price: value,
+          currency: 'SAR',
+          number_items: quantity,
+          transaction_id: orderId
+        })
+      } catch (e) {
+        console.warn('Snapchat thank you page tracking error:', e)
+      }
+    }
+
+    // Pinterest Tag - Checkout for thank you page
+    if (conversionPixels.pinterest && window.pintrk) {
+      try {
+        window.pintrk('track', 'checkout', {
+          order_id: orderId,
+          value: value,
+          order_quantity: quantity,
+          currency: 'SAR'
+        })
+      } catch (e) {
+        console.warn('Pinterest thank you page tracking error:', e)
+      }
+    }
+
+    // Google Analytics - Purchase for thank you page
+    if (conversionPixels.google && window.gtag) {
+      try {
+        window.gtag('event', 'purchase', {
+          transaction_id: orderId,
+          value: value,
+          currency: 'SAR',
+          items: items.map(i => ({
+            item_id: String(i.id || i.productId),
+            item_name: i.name,
+            price: i.price,
+            quantity: i.quantity || 1
+          }))
+        })
+      } catch (e) {
+        console.warn('Google Analytics thank you page tracking error:', e)
+      }
+    }
+
+    // Log conversion
+    this.trackEvent('thank_you_page_conversion', {
+      order_id: orderId,
+      order_value: value,
+      item_count: quantity,
+      pixels_fired: Object.keys(conversionPixels).filter(k => conversionPixels[k]),
+      timestamp: Date.now()
+    })
+  }
+
+  // Track wishlist additions
+  trackAddToWishlist(productId, productName, price) {
+    this.trackEvent('add_to_wishlist', {
+      product_id: productId,
+      product_name: productName,
+      price,
+      timestamp: Date.now()
+    })
+
+    // TikTok Pixel - AddToWishlist (checks if enabled)
+    this.ttqTrack('AddToWishlist', {
+      content_id: String(productId),
+      content_type: 'product',
+      content_name: productName,
+      price: Number(price) || 0,
+      currency: 'SAR'
+    }, 'addToWishlist')
+
+    // Facebook Pixel - AddToWishlist
+    this.fbqTrack('AddToWishlist', {
+      content_ids: [String(productId)],
+      content_type: 'product',
+      content_name: productName,
+      value: Number(price) || 0,
+      currency: 'SAR'
+    })
+  }
+
+  // Track contact/form submissions
+  trackContact(formType = 'contact') {
+    this.trackEvent('contact', {
+      form_type: formType,
+      timestamp: Date.now()
+    })
+
+    // TikTok Pixel - Contact (checks if enabled)
+    this.ttqTrack('Contact', {}, 'contact')
+
+    // Facebook Pixel - Contact
+    this.fbqTrack('Contact')
+  }
+
+  // Track form submissions
+  trackFormSubmit(formName) {
+    this.trackEvent('form_submit', {
+      form_name: formName,
+      timestamp: Date.now()
+    })
+
+    // TikTok Pixel - SubmitForm (checks if enabled)
+    this.ttqTrack('SubmitForm', {
+      form_name: formName
+    }, 'submitForm')
+
+    // Facebook Pixel - Lead
+    this.fbqTrack('Lead', {
+      content_name: formName
+    })
+  }
+
+  // Track newsletter subscription
+  trackSubscribe(email = '') {
+    this.trackEvent('subscribe', {
+      timestamp: Date.now()
+    })
+
+    // TikTok Pixel - Subscribe (checks if enabled)
+    this.ttqTrack('Subscribe', {}, 'subscribe')
+
+    // Facebook Pixel - Subscribe
+    this.fbqTrack('Subscribe')
+  }
 }
 
 // Create and export a singleton instance
@@ -399,3 +581,10 @@ export const trackCheckoutComplete = (orderId, cartValue, itemCount, paymentMeth
   analytics.trackCheckoutComplete(orderId, cartValue, itemCount, paymentMethod)
 export const trackFilterUsage = (filterType, filterValue) => analytics.trackFilterUsage(filterType, filterValue)
 export const trackSortUsage = (sortBy) => analytics.trackSortUsage(sortBy)
+export const trackThankYouPageConversion = (orderId, orderValue, itemCount, items) =>
+  analytics.trackThankYouPageConversion(orderId, orderValue, itemCount, items)
+export const trackAddToWishlist = (productId, productName, price) =>
+  analytics.trackAddToWishlist(productId, productName, price)
+export const trackContact = (formType) => analytics.trackContact(formType)
+export const trackFormSubmit = (formName) => analytics.trackFormSubmit(formName)
+export const trackSubscribe = (email) => analytics.trackSubscribe(email)
