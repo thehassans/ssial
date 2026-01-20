@@ -234,9 +234,7 @@ export default function SEODashboard() {
       setProducts(prods)
       
       const ctrs = countriesRes.countries || [
-        'UAE', 'Saudi Arabia', 'Kuwait', 'Qatar', 'Bahrain', 'Oman', 
-        'Egypt', 'Jordan', 'Lebanon', 'Iraq', 'India', 'Pakistan',
-        'USA', 'UK', 'Canada', 'Australia', 'KSA'
+        'Saudi Arabia', 'UAE', 'Kuwait', 'Qatar', 'Bahrain', 'Oman'
       ]
       setCountries(Array.isArray(ctrs) ? ctrs : Object.keys(ctrs))
       
@@ -288,11 +286,10 @@ export default function SEODashboard() {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Icons.overview },
     { id: 'meta', label: 'Meta Tags', icon: Icons.meta },
-    { id: 'pixels', label: 'Pixels', icon: Icons.pixels },
+    { id: 'countries', label: 'Country SEO', icon: Icons.globe },
     { id: 'events', label: 'Event Tracking', icon: Icons.events },
     { id: 'thankyou', label: 'Thank You', icon: Icons.thankYou },
     { id: 'analytics', label: 'Analytics', icon: Icons.analytics },
-    { id: 'countries', label: 'Country SEO', icon: Icons.globe },
     { id: 'products', label: 'Product SEO', icon: Icons.product },
     { id: 'schema', label: 'Schema', icon: Icons.schema },
     { id: 'advanced', label: 'Advanced', icon: Icons.settings },
@@ -658,155 +655,6 @@ export default function SEODashboard() {
                     <option value="summary">Summary</option>
                     <option value="summary_large_image">Summary Large Image</option>
                   </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tracking Pixels Tab */}
-        {activeTab === 'pixels' && (
-          <div>
-            <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                Social Media Pixels
-              </h3>
-              
-              <div style={{ display: 'grid', gap: '24px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1877f2' }}></span>
-                        Facebook/Meta Pixel
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.facebookPixel}
-                      onChange={e => setSeo({ ...seo, facebookPixel: e.target.value })}
-                      style={inputStyle}
-                      placeholder="123456789012345"
-                    />
-                    <p style={helpTextStyle}>Meta Events Manager → Data Sources</p>
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
-                        TikTok Pixel
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.tiktokPixel}
-                      onChange={e => setSeo({ ...seo, tiktokPixel: e.target.value })}
-                      style={inputStyle}
-                      placeholder="D5LMN53C77U4MKNK3QS0"
-                    />
-                    <p style={helpTextStyle}>TikTok Ads Manager → Events</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FFFC00' }}></span>
-                        Snapchat Pixel
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.snapchatPixel}
-                      onChange={e => setSeo({ ...seo, snapchatPixel: e.target.value })}
-                      style={inputStyle}
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    />
-                    <p style={helpTextStyle}>Snapchat Ads Manager → Events Manager</p>
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E60023' }}></span>
-                        Pinterest Tag
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.pinterestTag}
-                      onChange={e => setSeo({ ...seo, pinterestTag: e.target.value })}
-                      style={inputStyle}
-                      placeholder="123456789012"
-                    />
-                    <p style={helpTextStyle}>Pinterest Ads → Conversions</p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
-                        Twitter/X Pixel
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.twitterPixel}
-                      onChange={e => setSeo({ ...seo, twitterPixel: e.target.value })}
-                      style={inputStyle}
-                      placeholder="tw-xxxxx-xxxxx"
-                    />
-                    <p style={helpTextStyle}>X Ads → Events Manager</p>
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0A66C2' }}></span>
-                        LinkedIn Insight Tag
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={seo.linkedinTag}
-                      onChange={e => setSeo({ ...seo, linkedinTag: e.target.value })}
-                      style={inputStyle}
-                      placeholder="1234567"
-                    />
-                    <p style={helpTextStyle}>LinkedIn Campaign Manager → Insight Tag</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ 
-              ...cardStyle, 
-              background: '#fffbeb',
-              border: `1px solid #fde68a`,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <div style={{ 
-                  width: 32, height: 32, 
-                  borderRadius: '8px', 
-                  background: '#fef3c7', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                  </svg>
-                </div>
-                <div>
-                  <h4 style={{ margin: '0 0 6px', color: '#92400e', fontSize: '14px', fontWeight: 600 }}>Testing Tip</h4>
-                  <p style={{ margin: 0, color: '#a16207', fontSize: '13px', lineHeight: 1.5 }}>
-                    Use browser extensions like Meta Pixel Helper or TikTok Pixel Helper to verify your pixels are firing correctly.
-                  </p>
                 </div>
               </div>
             </div>
@@ -1258,35 +1106,37 @@ export default function SEODashboard() {
           <div>
             <div style={cardStyle}>
               <h3 style={{ margin: '0 0 8px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                Country-Specific SEO
+                Country-Specific SEO & Pixels
               </h3>
-              <p style={{ ...helpTextStyle, marginTop: 0, marginBottom: '24px' }}>Configure unique settings for each country.</p>
+              <p style={{ ...helpTextStyle, marginTop: 0, marginBottom: '24px' }}>Configure SEO settings and tracking pixels for each country.</p>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: 24, marginTop: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '24px', marginTop: '20px' }}>
                 {/* Country List */}
-                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 12, color: '#374151' }}>Select Country</div>
-                  <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ background: theme.colors.bg, borderRadius: theme.radius.lg, padding: '16px', border: `1px solid ${theme.colors.border}` }}>
+                  <div style={{ fontWeight: 500, marginBottom: '12px', color: theme.colors.text, fontSize: '13px' }}>Select Country</div>
+                  <div style={{ display: 'grid', gap: '6px' }}>
                     {countries.map(country => (
                       <button
                         key={country}
                         onClick={() => setSelectedCountry(country)}
                         style={{
-                          padding: '12px 16px',
-                          border: 'none',
-                          borderRadius: 8,
-                          background: selectedCountry === country ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : 'white',
-                          color: selectedCountry === country ? 'white' : '#374151',
+                          padding: '10px 14px',
+                          border: `1px solid ${selectedCountry === country ? theme.colors.text : theme.colors.border}`,
+                          borderRadius: theme.radius.md,
+                          background: selectedCountry === country ? theme.colors.text : theme.colors.card,
+                          color: selectedCountry === country ? '#fff' : theme.colors.text,
                           fontWeight: 500,
+                          fontSize: '13px',
                           cursor: 'pointer',
                           textAlign: 'left',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         <span>{country}</span>
-                        {countrySeo[country] && <span style={{ fontSize: 12, opacity: 0.7 }}>✓</span>}
+                        {countrySeo[country] && <span style={{ fontSize: 11, opacity: 0.7 }}>✓</span>}
                       </button>
                     ))}
                   </div>
@@ -1295,87 +1145,187 @@ export default function SEODashboard() {
                 {/* Country SEO Form */}
                 <div>
                   {selectedCountry ? (
-                    <div style={{ display: 'grid', gap: 20 }}>
-                      <div style={{ padding: 16, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', borderRadius: 12, color: 'white' }}>
-                        <h4 style={{ margin: 0 }}>SEO Settings for {selectedCountry}</h4>
-                      </div>
-                      
-                      <div>
-                        <label style={labelStyle}>Country-Specific Title Tag</label>
-                        <input
-                          type="text"
-                          value={countrySeo[selectedCountry]?.title || ''}
-                          onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], title: e.target.value } })}
-                          style={inputStyle}
-                          placeholder={`Best Products in ${selectedCountry} | Your Store`}
-                        />
+                    <div style={{ display: 'grid', gap: '20px' }}>
+                      <div style={{ padding: '16px 20px', background: theme.colors.text, borderRadius: theme.radius.md, color: '#fff' }}>
+                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Settings for {selectedCountry}</h4>
                       </div>
 
-                      <div>
-                        <label style={labelStyle}>Country-Specific Description</label>
-                        <textarea
-                          value={countrySeo[selectedCountry]?.description || ''}
-                          onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], description: e.target.value } })}
-                          style={{ ...inputStyle, minHeight: 80 }}
-                          placeholder={`Shop the best products with fast delivery to ${selectedCountry}...`}
-                        />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                        <div>
-                          <label style={labelStyle}>Country Facebook Pixel</label>
-                          <input
-                            type="text"
-                            value={countrySeo[selectedCountry]?.facebookPixel || ''}
-                            onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], facebookPixel: e.target.value } })}
-                            style={inputStyle}
-                            placeholder="Country-specific pixel ID"
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Country TikTok Pixel</label>
-                          <input
-                            type="text"
-                            value={countrySeo[selectedCountry]?.tiktokPixel || ''}
-                            onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], tiktokPixel: e.target.value } })}
-                            style={inputStyle}
-                            placeholder="Country-specific pixel ID"
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                        <div>
-                          <label style={labelStyle}>Country Google Analytics</label>
-                          <input
-                            type="text"
-                            value={countrySeo[selectedCountry]?.googleAnalytics || ''}
-                            onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], googleAnalytics: e.target.value } })}
-                            style={inputStyle}
-                            placeholder="G-XXXXXXXXXX"
-                          />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Hreflang Code</label>
-                          <input
-                            type="text"
-                            value={countrySeo[selectedCountry]?.hreflang || ''}
-                            onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], hreflang: e.target.value } })}
-                            style={inputStyle}
-                            placeholder="en-AE, ar-SA, etc."
-                          />
+                      {/* Meta Settings */}
+                      <div style={{ padding: '20px', background: theme.colors.bg, borderRadius: theme.radius.md, border: `1px solid ${theme.colors.border}` }}>
+                        <h5 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: theme.colors.text }}>Meta Tags</h5>
+                        <div style={{ display: 'grid', gap: '16px' }}>
+                          <div>
+                            <label style={labelStyle}>Title Tag</label>
+                            <input
+                              type="text"
+                              value={countrySeo[selectedCountry]?.title || ''}
+                              onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], title: e.target.value } })}
+                              style={inputStyle}
+                              placeholder={`Best Products in ${selectedCountry} | Your Store`}
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Description</label>
+                            <textarea
+                              value={countrySeo[selectedCountry]?.description || ''}
+                              onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], description: e.target.value } })}
+                              style={{ ...inputStyle, minHeight: 70 }}
+                              placeholder={`Shop the best products with fast delivery to ${selectedCountry}...`}
+                            />
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={labelStyle}>Keywords</label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.keywords || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], keywords: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="keywords, here"
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Hreflang Code</label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.hreflang || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], hreflang: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="en-AE, ar-SA"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label style={labelStyle}>Country Keywords</label>
-                        <input
-                          type="text"
-                          value={countrySeo[selectedCountry]?.keywords || ''}
-                          onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], keywords: e.target.value } })}
-                          style={inputStyle}
-                          placeholder="country-specific, keywords, here"
-                        />
+                      {/* Tracking Pixels */}
+                      <div style={{ padding: '20px', background: theme.colors.bg, borderRadius: theme.radius.md, border: `1px solid ${theme.colors.border}` }}>
+                        <h5 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: theme.colors.text }}>Tracking Pixels</h5>
+                        <div style={{ display: 'grid', gap: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#1877f2' }}></span>
+                                  Facebook Pixel
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.facebookPixel || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], facebookPixel: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="123456789012345"
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
+                                  TikTok Pixel
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.tiktokPixel || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], tiktokPixel: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="D5LMN53C77U4MKNK3QS0"
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FFFC00', border: '1px solid #ccc' }}></span>
+                                  Snapchat Pixel
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.snapchatPixel || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], snapchatPixel: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="xxxxxxxx-xxxx-xxxx"
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E60023' }}></span>
+                                  Pinterest Tag
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.pinterestTag || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], pinterestTag: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="123456789012"
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#000' }}></span>
+                                  Twitter/X Pixel
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.twitterPixel || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], twitterPixel: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="tw-xxxxx-xxxxx"
+                              />
+                            </div>
+                            <div>
+                              <label style={labelStyle}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0A66C2' }}></span>
+                                  LinkedIn Tag
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={countrySeo[selectedCountry]?.linkedinTag || ''}
+                                onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], linkedinTag: e.target.value } })}
+                                style={inputStyle}
+                                placeholder="1234567"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Analytics */}
+                      <div style={{ padding: '20px', background: theme.colors.bg, borderRadius: theme.radius.md, border: `1px solid ${theme.colors.border}` }}>
+                        <h5 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: theme.colors.text }}>Analytics</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div>
+                            <label style={labelStyle}>Google Analytics</label>
+                            <input
+                              type="text"
+                              value={countrySeo[selectedCountry]?.googleAnalytics || ''}
+                              onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], googleAnalytics: e.target.value } })}
+                              style={inputStyle}
+                              placeholder="G-XXXXXXXXXX"
+                            />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Google Tag Manager</label>
+                            <input
+                              type="text"
+                              value={countrySeo[selectedCountry]?.googleTagManager || ''}
+                              onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], googleTagManager: e.target.value } })}
+                              style={inputStyle}
+                              placeholder="GTM-XXXXXXX"
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <button
@@ -1384,21 +1334,24 @@ export default function SEODashboard() {
                         style={{
                           padding: '12px 24px',
                           border: 'none',
-                          borderRadius: 8,
-                          background: 'linear-gradient(135deg, #10b981, #059669)',
-                          color: 'white',
-                          fontWeight: 600,
+                          borderRadius: theme.radius.md,
+                          background: theme.colors.text,
+                          color: '#fff',
+                          fontWeight: 500,
+                          fontSize: '14px',
                           cursor: saving ? 'not-allowed' : 'pointer',
                           width: 'fit-content',
+                          opacity: saving ? 0.6 : 1,
+                          transition: 'all 0.15s ease',
                         }}
                       >
                         {saving ? 'Saving...' : `Save ${selectedCountry} Settings`}
                       </button>
                     </div>
                   ) : (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-                      <div style={{ fontSize: 48, marginBottom: 16 }}>🌍</div>
-                      <p>Select a country to configure its SEO settings</p>
+                    <div style={{ padding: '60px 40px', textAlign: 'center', color: theme.colors.textMuted, background: theme.colors.bg, borderRadius: theme.radius.lg, border: `1px solid ${theme.colors.border}` }}>
+                      <Icons.globe />
+                      <p style={{ marginTop: '12px', fontSize: '14px' }}>Select a country to configure settings</p>
                     </div>
                   )}
                 </div>
