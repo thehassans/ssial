@@ -1053,16 +1053,11 @@ router.post(
 router.get("/countries", async (_req, res) => {
   try {
     const doc = await Setting.findOne({ key: "countries" }).lean();
-    // All e-commerce site countries
+    // All 13 e-commerce site countries
     const defaultCountries = [
       'Saudi Arabia', 'UAE', 'Kuwait', 'Qatar', 'Bahrain', 'Oman',
-      'Egypt', 'Jordan', 'Lebanon', 'Iraq', 'India', 'Pakistan',
-      'USA', 'UK', 'Canada', 'Australia', 'Germany', 'France',
-      'Italy', 'Spain', 'Netherlands', 'Belgium', 'Sweden', 'Norway',
-      'Denmark', 'Finland', 'Switzerland', 'Austria', 'Poland',
-      'Turkey', 'Malaysia', 'Singapore', 'Indonesia', 'Thailand',
-      'Philippines', 'Vietnam', 'Japan', 'South Korea', 'China',
-      'South Africa', 'Nigeria', 'Kenya', 'Morocco', 'New Zealand'
+      'Egypt', 'Jordan', 'Lebanon', 'Iraq', 'India', 'Pakistan', 
+      'UK', 'USA', 'Australia', 'Canada'
     ];
     res.json({ countries: doc?.value?.countries || defaultCountries });
   } catch (e) {
