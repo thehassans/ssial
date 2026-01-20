@@ -1053,11 +1053,9 @@ router.post(
 router.get("/countries", async (_req, res) => {
   try {
     const doc = await Setting.findOne({ key: "countries" }).lean();
-    // All countries from the panel's stock system
+    // GCC countries for e-commerce
     const defaultCountries = [
-      'UAE', 'Saudi Arabia', 'Kuwait', 'Qatar', 'Bahrain', 'Oman', 
-      'Egypt', 'Jordan', 'Lebanon', 'Iraq', 'India', 'Pakistan',
-      'USA', 'UK', 'Canada', 'Australia', 'KSA'
+      'Saudi Arabia', 'UAE', 'Kuwait', 'Qatar', 'Bahrain', 'Oman'
     ];
     res.json({ countries: doc?.value?.countries || defaultCountries });
   } catch (e) {

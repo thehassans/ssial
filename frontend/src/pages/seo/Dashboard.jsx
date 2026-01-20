@@ -756,23 +756,50 @@ export default function SEODashboard() {
                   </p>
                 </div>
 
-                <div style={{ 
-                  padding: '16px', 
-                  background: '#fffbeb', 
-                  borderRadius: theme.radius.md,
-                  border: '1px solid #fde68a'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                    </svg>
-                    <span style={{ fontWeight: 600, color: '#92400e', fontSize: '14px' }}>TikTok Pixel ID Required</span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#a16207', lineHeight: 1.5 }}>
-                    Make sure you've added your TikTok Pixel ID in the Pixels tab for events to fire.
-                    Current: {seo.tiktokPixel ? <strong>{seo.tiktokPixel}</strong> : <span style={{ color: '#dc2626' }}>Not configured</span>}
-                  </p>
-                </div>
+                {(() => {
+                  // Check for TikTok Pixel in any country SEO settings
+                  const countryWithPixel = Object.entries(countrySeo).find(([_, data]) => data?.tiktokPixel?.trim());
+                  const hasPixel = countryWithPixel || seo.tiktokPixel?.trim();
+                  const pixelId = countryWithPixel ? countryWithPixel[1].tiktokPixel : seo.tiktokPixel;
+                  const pixelCountry = countryWithPixel ? countryWithPixel[0] : null;
+                  
+                  return hasPixel ? (
+                    <div style={{ 
+                      padding: '16px', 
+                      background: '#ecfdf5', 
+                      borderRadius: theme.radius.md,
+                      border: '1px solid #a7f3d0'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        <span style={{ fontWeight: 600, color: '#065f46', fontSize: '14px' }}>TikTok Pixel Connected</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#047857', lineHeight: 1.5 }}>
+                        Pixel ID: <strong>{pixelId}</strong>
+                        {pixelCountry && <span> (from {pixelCountry} settings)</span>}
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ 
+                      padding: '16px', 
+                      background: '#fffbeb', 
+                      borderRadius: theme.radius.md,
+                      border: '1px solid #fde68a'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <span style={{ fontWeight: 600, color: '#92400e', fontSize: '14px' }}>TikTok Pixel ID Required</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '13px', color: '#a16207', lineHeight: 1.5 }}>
+                        Add your TikTok Pixel ID in Country SEO → Select a country → Tracking Pixels section.
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
