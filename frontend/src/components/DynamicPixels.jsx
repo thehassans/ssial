@@ -20,64 +20,89 @@ export default function DynamicPixels() {
     let alive = true
     ;(async () => {
       try {
-        const res = await apiGet('/api/settings/seo')
-        if (!alive || !res?.seo) return
+        // Load both global SEO settings and country-specific settings
+        const [seoRes, countrySeoRes] = await Promise.all([
+          apiGet('/api/settings/seo'),
+          apiGet('/api/settings/country-seo').catch(() => ({ countrySeo: {} }))
+        ])
         
-        const seo = res.seo
+        if (!alive) return
+        
+        const seo = seoRes?.seo || {}
+        const countrySeo = countrySeoRes?.countrySeo || {}
         
         // Store full SEO settings globally for access by analytics
         window._seoSettings = seo
+        window._countrySeoSettings = countrySeo
+
+        // Detect user's country from localStorage or default to Saudi Arabia
+        const userCountry = localStorage.getItem('selectedCountry') || 'Saudi Arabia'
+        const countryPixels = countrySeo[userCountry] || {}
+        
+        // Merge global and country-specific settings (country takes priority)
+        const pixels = {
+          tiktokPixel: countryPixels.tiktokPixel || seo.tiktokPixel,
+          facebookPixel: countryPixels.facebookPixel || seo.facebookPixel,
+          snapchatPixel: countryPixels.snapchatPixel || seo.snapchatPixel,
+          pinterestTag: countryPixels.pinterestTag || seo.pinterestTag,
+          twitterPixel: countryPixels.twitterPixel || seo.twitterPixel,
+          linkedinTag: countryPixels.linkedinTag || seo.linkedinTag,
+          googleAnalytics: countryPixels.googleAnalytics || seo.googleAnalytics,
+          googleTagManager: countryPixels.googleTagManager || seo.googleTagManager,
+        }
+
+        console.log('Loading pixels for country:', userCountry, pixels)
 
         // TikTok Pixel
-        if (seo.tiktokPixel && seo.tiktokPixel.trim()) {
-          initTikTokPixel(seo.tiktokPixel.trim())
+        if (pixels.tiktokPixel && pixels.tiktokPixel.trim()) {
+          initTikTokPixel(pixels.tiktokPixel.trim())
           // Store pixel ID and event settings for later use
-          window._tiktokPixelId = seo.tiktokPixel.trim()
+          window._tiktokPixelId = pixels.tiktokPixel.trim()
           window._tiktokEvents = seo.tiktokEvents || {}
           window._thankYouPageSettings = seo.thankYouPage || {}
         }
 
         // Facebook/Meta Pixel
-        if (seo.facebookPixel && seo.facebookPixel.trim()) {
-          initFacebookPixel(seo.facebookPixel.trim())
+        if (pixels.facebookPixel && pixels.facebookPixel.trim()) {
+          initFacebookPixel(pixels.facebookPixel.trim())
         }
 
         // Snapchat Pixel
-        if (seo.snapchatPixel && seo.snapchatPixel.trim()) {
-          initSnapchatPixel(seo.snapchatPixel.trim())
+        if (pixels.snapchatPixel && pixels.snapchatPixel.trim()) {
+          initSnapchatPixel(pixels.snapchatPixel.trim())
         }
 
         // Twitter/X Pixel
-        if (seo.twitterPixel && seo.twitterPixel.trim()) {
-          initTwitterPixel(seo.twitterPixel.trim())
+        if (pixels.twitterPixel && pixels.twitterPixel.trim()) {
+          initTwitterPixel(pixels.twitterPixel.trim())
         }
 
         // Pinterest Tag
-        if (seo.pinterestTag && seo.pinterestTag.trim()) {
-          initPinterestTag(seo.pinterestTag.trim())
+        if (pixels.pinterestTag && pixels.pinterestTag.trim()) {
+          initPinterestTag(pixels.pinterestTag.trim())
         }
 
         // LinkedIn Tag
-        if (seo.linkedinTag && seo.linkedinTag.trim()) {
-          initLinkedInTag(seo.linkedinTag.trim())
+        if (pixels.linkedinTag && pixels.linkedinTag.trim()) {
+          initLinkedInTag(pixels.linkedinTag.trim())
         }
 
         // Google Analytics
-        if (seo.googleAnalytics && seo.googleAnalytics.trim()) {
-          initGoogleAnalytics(seo.googleAnalytics.trim())
+        if (pixels.googleAnalytics && pixels.googleAnalytics.trim()) {
+          initGoogleAnalytics(pixels.googleAnalytics.trim())
         }
 
         // Google Tag Manager
-        if (seo.googleTagManager && seo.googleTagManager.trim()) {
-          initGoogleTagManager(seo.googleTagManager.trim())
+        if (pixels.googleTagManager && pixels.googleTagManager.trim()) {
+          initGoogleTagManager(pixels.googleTagManager.trim())
         }
 
-        // Hotjar
+        // Hotjar (global only)
         if (seo.hotjarId && seo.hotjarId.trim()) {
           initHotjar(seo.hotjarId.trim())
         }
 
-        // Microsoft Clarity
+        // Microsoft Clarity (global only)
         if (seo.clarityId && seo.clarityId.trim()) {
           initClarity(seo.clarityId.trim())
         }
