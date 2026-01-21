@@ -22,6 +22,7 @@ async function getWA() {
 import ChatAssignment from "../models/ChatAssignment.js";
 import Order from "../models/Order.js";
 import DailyProfit from "../models/DailyProfit.js";
+import PayoutRequest from "../models/PayoutRequest.js";
 import mongoose from "mongoose";
 import { createNotification } from "../routes/notifications.js";
 
@@ -445,8 +446,9 @@ router.patch(
           const mgr = await User.findById(req.user.id).select(
             "managerPermissions createdBy"
           );
-          if (!mgr?.managerPermissions?.canCreateAgents)
+          if (!mgr?.managerPermissions?.canCreateAgents) {
             return res.status(403).json({ message: "Manager not allowed" });
+          }
           ownerId = String(mgr.createdBy || req.user.id);
         }
         if (String(agent.createdBy) !== String(ownerId)) {
@@ -663,6 +665,32 @@ router.get("/me", auth, async (req, res) => {
       }
     } catch (err) {
       console.error("Failed to calculate driver commission:", err);
+    }
+  }
+
+  if (u.role === "investor") {
+    try {
+      const earned = Number(u?.investorProfile?.earnedProfit || 0);
+      const payoutAgg = await PayoutRequest.aggregate([
+        {
+          $match: {
+            requesterType: "investor",
+            requesterId: u._id,
+            status: { $in: ["pending", "approved"] },
+          },
+        },
+        { $group: { _id: "$status", total: { $sum: "$amount" } } },
+      ]);
+      const pending =
+        payoutAgg.find((x) => String(x?._id) === "pending")?.total || 0;
+      const approved =
+        payoutAgg.find((x) => String(x?._id) === "approved")?.total || 0;
+      const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+      const available = round2(Math.max(0, earned - Number(pending) - Number(approved)));
+      if (!u.investorProfile) u.investorProfile = {};
+      u.investorProfile.availableBalance = available;
+    } catch (err) {
+      console.error("Failed to calculate investor available balance:", err);
     }
   }
 

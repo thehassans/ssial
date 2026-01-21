@@ -26,21 +26,39 @@ async function recalculateDropshipperProfitForOrder(order) {
 
   // Multi-item orders
   if (Array.isArray(order.items) && order.items.length > 0) {
+    let maxIdx = -1;
+    let maxDropPrice = -Infinity;
+
     for (let i = 0; i < order.items.length; i++) {
       const item = order.items[i];
-      const prod = item.product ? await Product.findById(item.product).lean() : null;
+      const pid = item?.productId || item?.product;
+      if (!pid) continue;
+      const prod = await Product.findById(pid).lean();
       if (!prod) continue;
-      
+      const dropPrice =
+        prod.dropshippingPrice != null ? prod.dropshippingPrice : prod.price || 0;
+      if (Number(dropPrice) > maxDropPrice) {
+        maxDropPrice = Number(dropPrice);
+        maxIdx = i;
+      }
+    }
+
+    for (let i = 0; i < order.items.length; i++) {
+      const item = order.items[i];
+      const pid = item?.productId || item?.product;
+      if (!pid) continue;
+      const prod = await Product.findById(pid).lean();
+      if (!prod) continue;
+
       const qty = Math.max(1, Number(item.quantity || 1));
-      const dropPrice = prod.dropshippingPrice != null ? prod.dropshippingPrice : prod.price || 0;
+      const dropPrice =
+        prod.dropshippingPrice != null ? prod.dropshippingPrice : prod.price || 0;
       const purchPrice = prod.purchasePrice != null ? prod.purchasePrice : prod.price || 0;
-      
-      if (i === 0) {
-        // First item: dropship price for 1, purchase price for rest
-        dropshipperPays += dropPrice + (purchPrice * (qty - 1));
+
+      if (i === maxIdx) {
+        dropshipperPays += Number(dropPrice) + Number(purchPrice) * (qty - 1);
       } else {
-        // Other items: purchase price for all
-        dropshipperPays += purchPrice * qty;
+        dropshipperPays += Number(purchPrice) * qty;
       }
     }
   } else if (order.productId) {

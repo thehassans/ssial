@@ -13,6 +13,7 @@ import Product from "../models/Product.js";
 import { getIO } from "../config/socket.js";
 import Setting from "../models/Setting.js";
 import PayoutRequest from "../models/PayoutRequest.js";
+import DailyProfit from "../models/DailyProfit.js";
 import DriverCommissionRequest from "../models/DriverCommissionRequest.js";
 import ManagerSalary from "../models/ManagerSalary.js";
 import { generatePayoutReceiptPDF } from "../utils/payoutReceipt.js";
@@ -4464,12 +4465,39 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
     const profitMap = {};
     profitAgg.forEach(p => { profitMap[String(p._id)] = p.total });
 
+    const payoutAgg = await PayoutRequest.aggregate([
+      {
+        $match: {
+          requesterType: "investor",
+          status: { $in: ["pending", "approved"] },
+        },
+      },
+      {
+        $group: {
+          _id: { requesterId: "$requesterId", status: "$status" },
+          total: { $sum: "$amount" },
+        },
+      },
+    ]);
+    const payoutMap = {};
+    payoutAgg.forEach((p) => {
+      const k = `${String(p?._id?.requesterId)}:${String(p?._id?.status)}`;
+      payoutMap[k] = Number(p?.total || 0);
+    });
+
     const earningsData = investors.map((inv) => {
       const profile = inv.investorProfile || {};
       const invested = profile.investmentAmount || profile.totalInvested || 0;
       
       // Use real aggregated profit if available, fallback to profile
       const earnedProfit = profitMap[String(inv._id)] || profile.earnedProfit || 0;
+
+      const pending = payoutMap[`${String(inv._id)}:pending`] || 0;
+      const approved = payoutMap[`${String(inv._id)}:approved`] || 0;
+      const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+      const availableBalance = round2(
+        Math.max(0, Number(earnedProfit || 0) - Number(pending || 0) - Number(approved || 0))
+      );
       
       // Total return is investment + profit
       const totalReturn = invested + earnedProfit;
@@ -4482,7 +4510,7 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
         invested: invested,
         returns: totalReturn,
         profit: earnedProfit,
-        balance: profile.availableBalance || 0
+        balance: availableBalance
       };
     });
 
@@ -4551,11 +4579,34 @@ router.post("/investors/payout-requests", auth, allowRoles("investor"), async (r
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // Check available balance
-    const user = await User.findById(req.user.id).select("firstName lastName investorProfile").lean();
-    const availableBalance = user?.investorProfile?.availableBalance || 0;
+    const existing = await PayoutRequest.findOne({
+      requesterType: "investor",
+      requesterId: req.user.id,
+      status: "pending",
+    }).select("_id");
+    if (existing) {
+      return res.status(400).json({ message: "You already have a pending request" });
+    }
 
-    if (amount > availableBalance) {
+    const user = await User.findById(req.user.id).select("firstName lastName investorProfile").lean();
+    const earned = Number(user?.investorProfile?.earnedProfit || 0);
+    const payoutAgg = await PayoutRequest.aggregate([
+      {
+        $match: {
+          requesterType: "investor",
+          requesterId: user?._id,
+          status: { $in: ["pending", "approved"] },
+        },
+      },
+      { $group: { _id: "$status", total: { $sum: "$amount" } } },
+    ]);
+    const pending = payoutAgg.find((x) => String(x?._id) === "pending")?.total || 0;
+    const approved = payoutAgg.find((x) => String(x?._id) === "approved")?.total || 0;
+    const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+    const availableBalance = round2(
+      Math.max(0, earned - Number(pending || 0) - Number(approved || 0))
+    );
+    if (Number(amount) > availableBalance) {
       return res.status(400).json({ message: "Amount exceeds available balance" });
     }
 
@@ -4564,6 +4615,7 @@ router.post("/investors/payout-requests", auth, allowRoles("investor"), async (r
       requesterType: "investor",
       requesterName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || "Unknown",
       amount,
+      currency: user?.investorProfile?.currency || "AED",
       notes
     });
 
@@ -4594,11 +4646,6 @@ router.post("/investors/payout-requests/:id/approve", auth, allowRoles("user", "
     request.processedBy = req.user.id;
     request.processedAt = new Date();
     await request.save();
-
-    // Update investor's available balance
-    await User.findByIdAndUpdate(request.requesterId, {
-      $inc: { "investorProfile.availableBalance": -request.amount }
-    });
 
     res.json({ success: true, message: "Payout approved" });
   } catch (error) {

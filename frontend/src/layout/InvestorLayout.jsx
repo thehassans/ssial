@@ -45,6 +45,14 @@ export default function InvestorLayout() {
     }
   }, [])
 
+  async function refreshUser() {
+    try {
+      const data = await apiGet('/users/me', { skipCache: true })
+      const u = data?.user || data
+      if (u && u.role === 'investor') setUser(u)
+    } catch {}
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('me')
@@ -183,7 +191,7 @@ export default function InvestorLayout() {
 
       {/* Main Content */}
       <main className="il-main">
-        <Outlet context={{ user, theme }} />
+        <Outlet context={{ user, theme, refreshUser }} />
       </main>
 
       {/* Bottom Navigation (Mobile Only) */}

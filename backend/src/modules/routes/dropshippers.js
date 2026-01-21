@@ -489,7 +489,29 @@ router.get("/earnings", auth, allowRoles("user", "admin"), async (req, res) => {
               _id: null,
               ordersDelivered: { $sum: 1 },
               revenue: { $sum: "$total" },
-              cost: { $sum: "$productCost" },
+              cost: {
+                $sum: {
+                  $let: {
+                    vars: {
+                      total: { $ifNull: ["$total", 0] },
+                      shipping: { $ifNull: ["$shippingFee", 0] },
+                      profit: { $ifNull: ["$dropshipperProfit.amount", 0] },
+                    },
+                    in: {
+                      $cond: [
+                        {
+                          $gt: [
+                            { $subtract: [{ $subtract: ["$$total", "$$shipping"] }, "$$profit"] },
+                            0,
+                          ],
+                        },
+                        { $subtract: [{ $subtract: ["$$total", "$$shipping"] }, "$$profit"] },
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
               profit: { $sum: "$dropshipperProfit.amount" }
             }
           }

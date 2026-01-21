@@ -98,6 +98,7 @@ const UserSchema = new mongoose.Schema(
       profitPercentage: { type: Number, default: 15 }, // Profit % per order (e.g., 15%)
       earnedProfit: { type: Number, default: 0 }, // Profit earned so far from orders
       totalReturn: { type: Number, default: 0 }, // investmentAmount + earnedProfit
+      availableBalance: { type: Number, default: 0 },
       currency: {
         type: String,
         enum: ["AED", "SAR", "OMR", "BHD", "INR", "KWD", "QAR", "USD", "CNY"],

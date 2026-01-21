@@ -6,7 +6,7 @@ import './Dashboard.css'
 
 export default function Transactions() {
   const toast = useToast()
-  const { user } = useOutletContext()
+  const { user, refreshUser } = useOutletContext()
   const profile = user?.investorProfile || {}
   const { currency = 'SAR', earnedProfit = 0, availableBalance = 0 } = profile
   
@@ -36,6 +36,9 @@ export default function Transactions() {
         notes: requestNotes
       })
       toast.success('Payout request submitted successfully!')
+      try {
+        await refreshUser?.()
+      } catch {}
       setShowRequestModal(false)
       setRequestAmount('')
       setRequestNotes('')
