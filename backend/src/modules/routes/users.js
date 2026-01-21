@@ -670,7 +670,13 @@ router.get("/me", auth, async (req, res) => {
 
   if (u.role === "investor") {
     try {
-      const earned = Number(u?.investorProfile?.earnedProfit || 0);
+      const earnedAgg = await DailyProfit.aggregate([
+        { $match: { investor: u._id } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]);
+      const earned = Number(
+        earnedAgg?.[0]?.total ?? u?.investorProfile?.earnedProfit ?? 0
+      );
       const payoutAgg = await PayoutRequest.aggregate([
         {
           $match: {

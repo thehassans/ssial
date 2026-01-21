@@ -28,7 +28,7 @@ export default function InvestorLayout() {
 
   useEffect(() => {
     let alive = true
-    apiGet('/users/me')
+    apiGet('/api/users/me', { skipCache: true })
       .then((data) => {
         if (!alive) return
         const u = data?.user || data
@@ -47,7 +47,7 @@ export default function InvestorLayout() {
 
   async function refreshUser() {
     try {
-      const data = await apiGet('/users/me', { skipCache: true })
+      const data = await apiGet('/api/users/me', { skipCache: true })
       const u = data?.user || data
       if (u && u.role === 'investor') setUser(u)
     } catch {}

@@ -4545,6 +4545,31 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
 });
 
 // Get investor payout requests (for admin/user panel)
+router.get(
+  "/investors/payout-requests/me",
+  auth,
+  allowRoles("investor"),
+  async (req, res) => {
+    try {
+      const requests = await PayoutRequest.find({
+        requesterType: "investor",
+        requesterId: req.user.id,
+      })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+
+      return res.json({ requests });
+    } catch (error) {
+      console.error("Investor My Payout Requests Error:", error);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch payout requests" });
+    }
+  }
+);
+
+// Get investor payout requests (for admin/user panel)
 router.get("/investors/payout-requests", auth, allowRoles("user", "admin"), async (req, res) => {
   try {
     const requests = await PayoutRequest.find({ requesterType: "investor" })
@@ -4573,11 +4598,7 @@ router.get("/investors/payout-requests", auth, allowRoles("user", "admin"), asyn
 // Investor creates payout request
 router.post("/investors/payout-requests", auth, allowRoles("investor"), async (req, res) => {
   try {
-    const { amount, notes } = req.body;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
+    const { amount, notes } = req.body || {};
 
     const existing = await PayoutRequest.findOne({
       requesterType: "investor",
@@ -4589,7 +4610,13 @@ router.post("/investors/payout-requests", auth, allowRoles("investor"), async (r
     }
 
     const user = await User.findById(req.user.id).select("firstName lastName investorProfile").lean();
-    const earned = Number(user?.investorProfile?.earnedProfit || 0);
+    const earnedAgg = await DailyProfit.aggregate([
+      { $match: { investor: user?._id } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    const earned = Number(
+      earnedAgg?.[0]?.total ?? user?.investorProfile?.earnedProfit ?? 0
+    );
     const payoutAgg = await PayoutRequest.aggregate([
       {
         $match: {
@@ -4606,15 +4633,27 @@ router.post("/investors/payout-requests", auth, allowRoles("investor"), async (r
     const availableBalance = round2(
       Math.max(0, earned - Number(pending || 0) - Number(approved || 0))
     );
-    if (Number(amount) > availableBalance) {
-      return res.status(400).json({ message: "Amount exceeds available balance" });
+    if (Number(availableBalance) <= 0) {
+      return res.status(400).json({ message: "No available balance" });
+    }
+
+    const amountToRequest = Number(availableBalance);
+    if (
+      amount != null &&
+      amount !== "" &&
+      !Number.isNaN(Number(amount)) &&
+      Math.abs(Number(amount) - amountToRequest) > 0.01
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Amount must equal available balance" });
     }
 
     const request = new PayoutRequest({
       requesterId: req.user.id,
       requesterType: "investor",
       requesterName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || "Unknown",
-      amount,
+      amount: amountToRequest,
       currency: user?.investorProfile?.currency || "AED",
       notes
     });
