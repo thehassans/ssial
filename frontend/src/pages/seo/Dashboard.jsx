@@ -846,6 +846,13 @@ export default function SEODashboard() {
                   const hasPixel = countryWithPixel || seo.tiktokPixel?.trim();
                   const pixelId = countryWithPixel ? countryWithPixel[1].tiktokPixel : seo.tiktokPixel;
                   const pixelCountry = countryWithPixel ? countryWithPixel[0] : null;
+
+                  const ids = String(pixelId || '')
+                    .split(/[\n,]+/g)
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean)
+                  const displayId = ids[0] || ''
+                  const extraCount = Math.max(0, ids.length - 1)
                   
                   return hasPixel ? (
                     <div style={{ 
@@ -861,7 +868,7 @@ export default function SEODashboard() {
                         <span style={{ fontWeight: 600, color: '#065f46', fontSize: '14px' }}>TikTok Pixel Connected</span>
                       </div>
                       <p style={{ margin: 0, fontSize: '13px', color: '#047857', lineHeight: 1.5 }}>
-                        Pixel ID: <strong>{pixelId}</strong>
+                        Pixel ID: <strong>{displayId}{extraCount ? ` (+${extraCount} more)` : ''}</strong>
                         {pixelCountry && <span> (from {pixelCountry} settings)</span>}
                       </p>
                     </div>
@@ -1336,11 +1343,10 @@ export default function SEODashboard() {
                                   TikTok Pixel
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.tiktokPixel || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], tiktokPixel: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="D5LMN53C77U4MKNK3QS0"
                               />
                             </div>
