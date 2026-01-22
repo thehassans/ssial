@@ -9,6 +9,19 @@ class Analytics {
     this.pageViewDebounceMs = 500 // Debounce page views
   }
 
+  getEventTrackingSettings() {
+    const settings = (typeof window !== 'undefined' && window._seoSettings) ? window._seoSettings : {}
+    const eventTracking = settings?.eventTracking
+    return eventTracking && typeof eventTracking === 'object' ? eventTracking : {}
+  }
+
+  isPlatformEventEnabled(platformKey, eventKey) {
+    const settings = this.getEventTrackingSettings()
+    const platform = settings?.[platformKey]
+    if (!platform || typeof platform !== 'object') return true
+    return platform?.[eventKey] !== false
+  }
+
   // Check if TikTok event is enabled in settings
   isTikTokEventEnabled(eventKey) {
     const events = window._tiktokEvents || {}
@@ -43,8 +56,11 @@ class Analytics {
   }
 
   // Facebook Pixel helper - safely call fbq methods
-  fbqTrack(eventName, params = {}) {
+  fbqTrack(eventName, params = {}, eventKey = null) {
     if (typeof window !== 'undefined' && window.fbq) {
+      if (eventKey && !this.isPlatformEventEnabled('facebook', eventKey)) {
+        return
+      }
       try {
         window.fbq('track', eventName, params)
       } catch (e) {
@@ -54,12 +70,43 @@ class Analytics {
   }
 
   // Snapchat Pixel helper
-  snaptrTrack(eventName, params = {}) {
+  snaptrTrack(eventName, params = {}, eventKey = null) {
     if (typeof window !== 'undefined' && window.snaptr) {
+      if (eventKey && !this.isPlatformEventEnabled('snapchat', eventKey)) {
+        return
+      }
       try {
         window.snaptr('track', eventName, params)
       } catch (e) {
         console.warn('Snapchat Pixel tracking error:', e)
+      }
+    }
+  }
+
+  // Pinterest Tag helper
+  pintrkTrack(eventName, params = {}, eventKey = null) {
+    if (typeof window !== 'undefined' && window.pintrk) {
+      if (eventKey && !this.isPlatformEventEnabled('pinterest', eventKey)) {
+        return
+      }
+      try {
+        window.pintrk('track', eventName, params)
+      } catch (e) {
+        console.warn('Pinterest Tag tracking error:', e)
+      }
+    }
+  }
+
+  // Google Analytics helper
+  gtagTrack(eventName, params = {}, eventKey = null) {
+    if (typeof window !== 'undefined' && window.gtag) {
+      if (eventKey && !this.isPlatformEventEnabled('google', eventKey)) {
+        return
+      }
+      try {
+        window.gtag('event', eventName, params)
+      } catch (e) {
+        console.warn('Google Analytics tracking error:', e)
       }
     }
   }
@@ -126,7 +173,7 @@ class Analytics {
       content_category: category,
       value: Number(price) || 0,
       currency: 'SAR'
-    })
+    }, 'viewContent')
 
     // Snapchat Pixel - VIEW_CONTENT event
     this.snaptrTrack('VIEW_CONTENT', {
@@ -134,7 +181,28 @@ class Analytics {
       item_category: category,
       price: Number(price) || 0,
       currency: 'SAR'
-    })
+    }, 'viewContent')
+
+    // Pinterest Tag - PageVisit
+    this.pintrkTrack('pagevisit', {
+      value: Number(price) || 0,
+      currency: 'SAR'
+    }, 'viewContent')
+
+    // Google Analytics - view_item
+    this.gtagTrack('view_item', {
+      currency: 'SAR',
+      value: Number(price) || 0,
+      items: [
+        {
+          item_id: String(productId),
+          item_name: productName,
+          item_category: category,
+          price: Number(price) || 0,
+          quantity: 1,
+        },
+      ],
+    }, 'viewContent')
   }
 
   // Track add to cart events
@@ -167,14 +235,35 @@ class Analytics {
       content_name: productName,
       value: totalValue,
       currency: 'SAR'
-    })
+    }, 'addToCart')
 
     // Snapchat Pixel - ADD_CART event
     this.snaptrTrack('ADD_CART', {
       item_ids: [String(productId)],
       price: totalValue,
       currency: 'SAR'
-    })
+    }, 'addToCart')
+
+    // Pinterest Tag - AddToCart
+    this.pintrkTrack('addtocart', {
+      value: totalValue,
+      order_quantity: Number(quantity) || 1,
+      currency: 'SAR'
+    }, 'addToCart')
+
+    // Google Analytics - add_to_cart
+    this.gtagTrack('add_to_cart', {
+      currency: 'SAR',
+      value: totalValue,
+      items: [
+        {
+          item_id: String(productId),
+          item_name: productName,
+          price: Number(price) || 0,
+          quantity: Number(quantity) || 1,
+        },
+      ],
+    }, 'addToCart')
   }
 
   // Track remove from cart events
@@ -205,12 +294,22 @@ class Analytics {
     this.fbqTrack('Search', {
       search_string: query,
       content_type: 'product'
-    })
+    }, 'search')
 
     // Snapchat Pixel - SEARCH event
     this.snaptrTrack('SEARCH', {
       search_string: query
-    })
+    }, 'search')
+
+    // Pinterest Tag - Search
+    this.pintrkTrack('search', {
+      search_query: query
+    }, 'search')
+
+    // Google Analytics - search
+    this.gtagTrack('search', {
+      search_term: query
+    }, 'search')
   }
 
   // Track checkout events
@@ -238,14 +337,21 @@ class Analytics {
       num_items: quantity,
       value: value,
       currency: 'SAR'
-    })
+    }, 'initiateCheckout')
 
     // Snapchat Pixel - START_CHECKOUT event
     this.snaptrTrack('START_CHECKOUT', {
       price: value,
       currency: 'SAR',
       number_items: quantity
-    })
+    }, 'initiateCheckout')
+
+    // Google Analytics - begin_checkout
+    this.gtagTrack('begin_checkout', {
+      currency: 'SAR',
+      value: value,
+      items: [],
+    }, 'initiateCheckout')
   }
 
   trackCheckoutComplete(orderId, cartValue, itemCount, paymentMethod) {
@@ -274,7 +380,7 @@ class Analytics {
       num_items: quantity,
       value: value,
       currency: 'SAR'
-    })
+    }, 'completePayment')
 
     // Snapchat Pixel - PURCHASE event
     this.snaptrTrack('PURCHASE', {
@@ -282,7 +388,23 @@ class Analytics {
       currency: 'SAR',
       transaction_id: String(orderId),
       number_items: quantity
-    })
+    }, 'completePayment')
+
+    // Pinterest Tag - Checkout
+    this.pintrkTrack('checkout', {
+      order_id: String(orderId),
+      value: value,
+      order_quantity: quantity,
+      currency: 'SAR'
+    }, 'completePayment')
+
+    // Google Analytics - purchase
+    this.gtagTrack('purchase', {
+      transaction_id: String(orderId),
+      value: value,
+      currency: 'SAR',
+      items: [],
+    }, 'completePayment')
   }
 
   // Track filter usage
@@ -355,8 +477,27 @@ class Analytics {
     // In production, you might want to batch events and send them periodically
     
     if (window.gtag) {
-      // Google Analytics 4 example
-      window.gtag('event', event.event_name, event.properties)
+      const skip = new Set([
+        'page_view',
+        'product_view',
+        'add_to_cart',
+        'search',
+        'checkout_start',
+        'checkout_complete',
+        'add_to_wishlist',
+        'contact',
+        'form_submit',
+        'subscribe',
+        'thank_you_page_conversion',
+      ])
+
+      if (!skip.has(event.event_name)) {
+        try {
+          window.gtag('event', event.event_name, event.properties)
+        } catch (e) {
+          console.warn('Google Analytics tracking error:', e)
+        }
+      }
     }
     
     // You could also send to your own analytics endpoint
@@ -412,94 +553,61 @@ class Analytics {
     if (!settings.enabled) return
 
     // TikTok Pixel - CompletePayment for thank you page
-    if (conversionPixels.tiktok && window.ttq) {
-      try {
-        const params = {
-          content_type: 'product',
-          content_ids: items.map(i => String(i.id || i.productId)),
-          quantity: quantity,
-          value: value,
-          currency: 'SAR'
-        }
-
-        const ids = Array.isArray(window._tiktokPixelIds) ? window._tiktokPixelIds : []
-        if (ids.length && typeof window.ttq.instance === 'function') {
-          ids.forEach((id) => {
-            try {
-              window.ttq.instance(id).track('CompletePayment', params)
-            } catch (e) {
-              console.warn('TikTok thank you page tracking error:', e)
-            }
-          })
-        } else {
-          window.ttq.track('CompletePayment', params)
-        }
-      } catch (e) {
-        console.warn('TikTok thank you page tracking error:', e)
-      }
+    if (conversionPixels.tiktok) {
+      this.ttqTrack('CompletePayment', {
+        content_type: 'product',
+        content_ids: items.map(i => String(i.id || i.productId)),
+        quantity: quantity,
+        value: value,
+        currency: 'SAR'
+      }, 'completePayment')
     }
 
     // Facebook Pixel - Purchase for thank you page
-    if (conversionPixels.facebook && window.fbq) {
-      try {
-        window.fbq('track', 'Purchase', {
-          content_type: 'product',
-          content_ids: items.map(i => String(i.id || i.productId)),
-          num_items: quantity,
-          value: value,
-          currency: 'SAR'
-        })
-      } catch (e) {
-        console.warn('Facebook thank you page tracking error:', e)
-      }
+    if (conversionPixels.facebook) {
+      this.fbqTrack('Purchase', {
+        content_type: 'product',
+        content_ids: items.map(i => String(i.id || i.productId)),
+        num_items: quantity,
+        value: value,
+        currency: 'SAR'
+      }, 'completePayment')
     }
 
     // Snapchat Pixel - PURCHASE for thank you page
-    if (conversionPixels.snapchat && window.snaptr) {
-      try {
-        window.snaptr('track', 'PURCHASE', {
-          item_ids: items.map(i => String(i.id || i.productId)),
-          price: value,
-          currency: 'SAR',
-          number_items: quantity,
-          transaction_id: orderId
-        })
-      } catch (e) {
-        console.warn('Snapchat thank you page tracking error:', e)
-      }
+    if (conversionPixels.snapchat) {
+      this.snaptrTrack('PURCHASE', {
+        item_ids: items.map(i => String(i.id || i.productId)),
+        price: value,
+        currency: 'SAR',
+        number_items: quantity,
+        transaction_id: orderId
+      }, 'completePayment')
     }
 
     // Pinterest Tag - Checkout for thank you page
-    if (conversionPixels.pinterest && window.pintrk) {
-      try {
-        window.pintrk('track', 'checkout', {
-          order_id: orderId,
-          value: value,
-          order_quantity: quantity,
-          currency: 'SAR'
-        })
-      } catch (e) {
-        console.warn('Pinterest thank you page tracking error:', e)
-      }
+    if (conversionPixels.pinterest) {
+      this.pintrkTrack('checkout', {
+        order_id: orderId,
+        value: value,
+        order_quantity: quantity,
+        currency: 'SAR'
+      }, 'completePayment')
     }
 
     // Google Analytics - Purchase for thank you page
-    if (conversionPixels.google && window.gtag) {
-      try {
-        window.gtag('event', 'purchase', {
-          transaction_id: orderId,
-          value: value,
-          currency: 'SAR',
-          items: items.map(i => ({
-            item_id: String(i.id || i.productId),
-            item_name: i.name,
-            price: i.price,
-            quantity: i.quantity || 1
-          }))
-        })
-      } catch (e) {
-        console.warn('Google Analytics thank you page tracking error:', e)
-      }
+    if (conversionPixels.google) {
+      this.gtagTrack('purchase', {
+        transaction_id: orderId,
+        value: value,
+        currency: 'SAR',
+        items: items.map(i => ({
+          item_id: String(i.id || i.productId),
+          item_name: i.name,
+          price: i.price,
+          quantity: i.quantity || 1
+        }))
+      }, 'completePayment')
     }
 
     // Log conversion
@@ -537,7 +645,28 @@ class Analytics {
       content_name: productName,
       value: Number(price) || 0,
       currency: 'SAR'
-    })
+    }, 'addToWishlist')
+
+    // Snapchat Pixel - ADD_TO_WISHLIST
+    this.snaptrTrack('ADD_TO_WISHLIST', {
+      item_ids: [String(productId)],
+      price: Number(price) || 0,
+      currency: 'SAR'
+    }, 'addToWishlist')
+
+    // Google Analytics - add_to_wishlist
+    this.gtagTrack('add_to_wishlist', {
+      currency: 'SAR',
+      value: Number(price) || 0,
+      items: [
+        {
+          item_id: String(productId),
+          item_name: productName,
+          price: Number(price) || 0,
+          quantity: 1,
+        },
+      ],
+    }, 'addToWishlist')
   }
 
   // Track contact/form submissions
@@ -551,7 +680,23 @@ class Analytics {
     this.ttqTrack('Contact', {}, 'contact')
 
     // Facebook Pixel - Contact
-    this.fbqTrack('Contact')
+    this.fbqTrack('Contact', {}, 'contact')
+
+    // Snapchat Pixel - SIGN_UP (closest match)
+    this.snaptrTrack('SIGN_UP', {
+      sign_up_method: formType
+    }, 'contact')
+
+    // Pinterest Tag - Lead
+    this.pintrkTrack('lead', {
+      lead_type: formType
+    }, 'contact')
+
+    // Google Analytics - generate_lead
+    this.gtagTrack('generate_lead', {
+      value: 0,
+      currency: 'SAR'
+    }, 'contact')
   }
 
   // Track form submissions
@@ -569,7 +714,23 @@ class Analytics {
     // Facebook Pixel - Lead
     this.fbqTrack('Lead', {
       content_name: formName
-    })
+    }, 'submitForm')
+
+    // Snapchat Pixel - SIGN_UP (closest match)
+    this.snaptrTrack('SIGN_UP', {
+      sign_up_method: formName
+    }, 'submitForm')
+
+    // Pinterest Tag - Lead
+    this.pintrkTrack('lead', {
+      lead_type: formName
+    }, 'submitForm')
+
+    // Google Analytics - generate_lead
+    this.gtagTrack('generate_lead', {
+      value: 0,
+      currency: 'SAR'
+    }, 'submitForm')
   }
 
   // Track newsletter subscription
@@ -582,7 +743,22 @@ class Analytics {
     this.ttqTrack('Subscribe', {}, 'subscribe')
 
     // Facebook Pixel - Subscribe
-    this.fbqTrack('Subscribe')
+    this.fbqTrack('Subscribe', {}, 'subscribe')
+
+    // Snapchat Pixel - SIGN_UP
+    this.snaptrTrack('SIGN_UP', {
+      sign_up_method: 'newsletter'
+    }, 'subscribe')
+
+    // Pinterest Tag - Signup
+    this.pintrkTrack('signup', {
+      lead_type: 'newsletter'
+    }, 'subscribe')
+
+    // Google Analytics - sign_up
+    this.gtagTrack('sign_up', {
+      method: 'newsletter'
+    }, 'subscribe')
   }
 }
 

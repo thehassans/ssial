@@ -183,6 +183,56 @@ export default function SEODashboard() {
       submitForm: false,
       subscribe: false,
     },
+    eventTracking: {
+      facebook: {
+        pageView: true,
+        viewContent: true,
+        addToCart: true,
+        initiateCheckout: true,
+        completePayment: true,
+        search: true,
+        addToWishlist: true,
+        contact: false,
+        submitForm: false,
+        subscribe: false,
+      },
+      snapchat: {
+        pageView: true,
+        viewContent: true,
+        addToCart: true,
+        initiateCheckout: true,
+        completePayment: true,
+        search: true,
+        addToWishlist: true,
+        contact: false,
+        submitForm: false,
+        subscribe: false,
+      },
+      pinterest: {
+        pageView: true,
+        viewContent: true,
+        addToCart: true,
+        initiateCheckout: true,
+        completePayment: true,
+        search: true,
+        addToWishlist: true,
+        contact: false,
+        submitForm: false,
+        subscribe: false,
+      },
+      google: {
+        pageView: true,
+        viewContent: true,
+        addToCart: true,
+        initiateCheckout: true,
+        completePayment: true,
+        search: true,
+        addToWishlist: true,
+        contact: false,
+        submitForm: false,
+        subscribe: false,
+      },
+    },
     // Thank You Page Settings
     thankYouPage: {
       enabled: true,
@@ -815,6 +865,73 @@ export default function SEODashboard() {
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div style={cardStyle}>
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Platform Event Tracking
+              </h3>
+              <p style={{ ...helpTextStyle, marginTop: '-16px', marginBottom: '20px' }}>
+                Enable or disable events for each platform.
+              </p>
+
+              {[
+                { key: 'facebook', label: 'Facebook/Meta' },
+                { key: 'snapchat', label: 'Snapchat' },
+                { key: 'pinterest', label: 'Pinterest' },
+                { key: 'google', label: 'Google Analytics' },
+              ].map((platform) => (
+                <div key={platform.key} style={{ marginBottom: 18 }}>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: theme.colors.text, marginBottom: 10 }}>
+                    {platform.label}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {[
+                      { key: 'pageView', label: 'Page View' },
+                      { key: 'viewContent', label: 'View Content' },
+                      { key: 'addToCart', label: 'Add to Cart' },
+                      { key: 'initiateCheckout', label: 'Initiate Checkout' },
+                      { key: 'completePayment', label: 'Complete Payment' },
+                      { key: 'search', label: 'Search' },
+                      { key: 'addToWishlist', label: 'Add to Wishlist' },
+                      { key: 'contact', label: 'Contact' },
+                      { key: 'submitForm', label: 'Submit Form' },
+                      { key: 'subscribe', label: 'Subscribe' },
+                    ].map((ev) => (
+                      <label
+                        key={`${platform.key}:${ev.key}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '12px 14px',
+                          background: theme.colors.bg,
+                          borderRadius: theme.radius.md,
+                          border: `1px solid ${theme.colors.border}`,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={seo.eventTracking?.[platform.key]?.[ev.key] || false}
+                          onChange={e => setSeo({
+                            ...seo,
+                            eventTracking: {
+                              ...(seo.eventTracking || {}),
+                              [platform.key]: {
+                                ...((seo.eventTracking || {})[platform.key] || {}),
+                                [ev.key]: e.target.checked
+                              }
+                            }
+                          })}
+                          style={{ width: 16, height: 16, accentColor: theme.colors.text }}
+                        />
+                        <span style={{ fontWeight: 500, fontSize: '13px', color: theme.colors.text }}>{ev.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Event Data Settings */}

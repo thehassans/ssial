@@ -16,6 +16,15 @@ function normalizeIds(value) {
   return Array.from(new Set(raw))
 }
 
+function isPageViewEnabled(platformKey) {
+  if (typeof window === 'undefined') return true
+  const et = window._seoSettings?.eventTracking
+  if (!et || typeof et !== 'object') return true
+  const platform = et?.[platformKey]
+  if (!platform || typeof platform !== 'object') return true
+  return platform?.pageView !== false
+}
+
 /**
  * DynamicPixels - Injects tracking pixels dynamically based on SEO settings
  * This component loads pixel IDs from the backend and injects the appropriate scripts
@@ -75,12 +84,12 @@ export default function DynamicPixels() {
 
         // TikTok Pixel
         if (pixels.tiktokPixel.length) {
-          initTikTokPixels(pixels.tiktokPixel)
           // Store pixel IDs and event settings for later use
           window._tiktokPixelIds = pixels.tiktokPixel
           window._tiktokPixelId = pixels.tiktokPixel[0]
           window._tiktokEvents = seo.tiktokEvents || {}
           window._thankYouPageSettings = seo.thankYouPage || {}
+          initTikTokPixels(pixels.tiktokPixel)
         }
 
         // Facebook/Meta Pixel
@@ -162,7 +171,11 @@ function trackAllPixelsPageView(pathname) {
   if (window.ttq) {
     try {
       const ids = Array.isArray(window._tiktokPixelIds) ? window._tiktokPixelIds : []
-      if (ids.length && typeof window.ttq.instance === 'function') {
+      const enabled = (window._tiktokEvents || {}).pageView !== false
+
+      if (!enabled) {
+        // no-op
+      } else if (ids.length && typeof window.ttq.instance === 'function') {
         ids.forEach((id) => {
           try {
             window.ttq.instance(id).page()
@@ -180,37 +193,45 @@ function trackAllPixelsPageView(pathname) {
 
   // Facebook Pixel page view
   if (window.fbq) {
-    try {
-      window.fbq('track', 'PageView')
-    } catch (e) {
-      console.warn('Facebook page tracking error:', e)
+    if (isPageViewEnabled('facebook')) {
+      try {
+        window.fbq('track', 'PageView')
+      } catch (e) {
+        console.warn('Facebook page tracking error:', e)
+      }
     }
   }
 
   // Snapchat Pixel page view
   if (window.snaptr) {
-    try {
-      window.snaptr('track', 'PAGE_VIEW')
-    } catch (e) {
-      console.warn('Snapchat page tracking error:', e)
+    if (isPageViewEnabled('snapchat')) {
+      try {
+        window.snaptr('track', 'PAGE_VIEW')
+      } catch (e) {
+        console.warn('Snapchat page tracking error:', e)
+      }
     }
   }
 
   // Pinterest page view
   if (window.pintrk) {
-    try {
-      window.pintrk('page')
-    } catch (e) {
-      console.warn('Pinterest page tracking error:', e)
+    if (isPageViewEnabled('pinterest')) {
+      try {
+        window.pintrk('page')
+      } catch (e) {
+        console.warn('Pinterest page tracking error:', e)
+      }
     }
   }
 
   // Google Analytics page view (handled automatically by react-router usually)
   if (window.gtag) {
-    try {
-      window.gtag('event', 'page_view', { page_path: pathname })
-    } catch (e) {
-      console.warn('Google Analytics page tracking error:', e)
+    if (isPageViewEnabled('google')) {
+      try {
+        window.gtag('event', 'page_view', { page_path: pathname })
+      } catch (e) {
+        console.warn('Google Analytics page tracking error:', e)
+      }
     }
   }
 }
@@ -261,10 +282,12 @@ function initTikTokPixels(pixelIds) {
   ensureTikTokBaseLoaded()
   if (!window.ttq) return
 
+  const pageViewEnabled = (window._tiktokEvents || {}).pageView !== false
+
   pixelIds.forEach((id) => {
     try {
       window.ttq.load(id)
-      if (typeof window.ttq.instance === 'function') {
+      if (pageViewEnabled && typeof window.ttq.instance === 'function') {
         window.ttq.instance(id).page()
       }
     } catch (e) {
@@ -272,9 +295,11 @@ function initTikTokPixels(pixelIds) {
     }
   })
 
-  try {
-    window.ttq.page()
-  } catch {}
+  if (pageViewEnabled && typeof window.ttq.instance !== 'function') {
+    try {
+      window.ttq.page()
+    } catch {}
+  }
 
   console.log('TikTok Pixel initialized:', pixelIds)
 }
@@ -313,9 +338,11 @@ function initFacebookPixels(pixelIds) {
     }
   })
 
-  try {
-    window.fbq('track', 'PageView')
-  } catch {}
+  if (isPageViewEnabled('facebook')) {
+    try {
+      window.fbq('track', 'PageView')
+    } catch {}
+  }
 
   console.log('Facebook Pixel initialized:', pixelIds)
 }
@@ -351,9 +378,11 @@ function initSnapchatPixels(pixelIds) {
     }
   })
 
-  try {
-    window.snaptr('track', 'PAGE_VIEW')
-  } catch {}
+  if (isPageViewEnabled('snapchat')) {
+    try {
+      window.snaptr('track', 'PAGE_VIEW')
+    } catch {}
+  }
 
   console.log('Snapchat Pixel initialized:', pixelIds)
 }
@@ -418,9 +447,11 @@ function initPinterestTags(tagIds) {
     }
   })
 
-  try {
-    window.pintrk('page')
-  } catch {}
+  if (isPageViewEnabled('pinterest')) {
+    try {
+      window.pintrk('page')
+    } catch {}
+  }
 
   console.log('Pinterest Tag initialized:', tagIds)
 }

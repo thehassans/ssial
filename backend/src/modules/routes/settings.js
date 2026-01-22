@@ -757,6 +757,56 @@ router.get("/seo", async (_req, res) => {
         submitForm: false,
         subscribe: false,
       },
+      eventTracking: {
+        facebook: {
+          pageView: true,
+          viewContent: true,
+          addToCart: true,
+          initiateCheckout: true,
+          completePayment: true,
+          search: true,
+          addToWishlist: true,
+          contact: false,
+          submitForm: false,
+          subscribe: false,
+        },
+        snapchat: {
+          pageView: true,
+          viewContent: true,
+          addToCart: true,
+          initiateCheckout: true,
+          completePayment: true,
+          search: true,
+          addToWishlist: true,
+          contact: false,
+          submitForm: false,
+          subscribe: false,
+        },
+        pinterest: {
+          pageView: true,
+          viewContent: true,
+          addToCart: true,
+          initiateCheckout: true,
+          completePayment: true,
+          search: true,
+          addToWishlist: true,
+          contact: false,
+          submitForm: false,
+          subscribe: false,
+        },
+        google: {
+          pageView: true,
+          viewContent: true,
+          addToCart: true,
+          initiateCheckout: true,
+          completePayment: true,
+          search: true,
+          addToWishlist: true,
+          contact: false,
+          submitForm: false,
+          subscribe: false,
+        },
+      },
       thankYouPage: {
         enabled: false,
         path: "/thank-you",
@@ -783,6 +833,26 @@ router.get("/seo", async (_req, res) => {
       ...defaults,
       ...stored,
       tiktokEvents: { ...defaults.tiktokEvents, ...(stored.tiktokEvents || {}) },
+      eventTracking: {
+        ...defaults.eventTracking,
+        ...((stored.eventTracking && typeof stored.eventTracking === "object") ? stored.eventTracking : {}),
+        facebook: {
+          ...defaults.eventTracking.facebook,
+          ...(((stored.eventTracking || {}).facebook || {})),
+        },
+        snapchat: {
+          ...defaults.eventTracking.snapchat,
+          ...(((stored.eventTracking || {}).snapchat || {})),
+        },
+        pinterest: {
+          ...defaults.eventTracking.pinterest,
+          ...(((stored.eventTracking || {}).pinterest || {})),
+        },
+        google: {
+          ...defaults.eventTracking.google,
+          ...(((stored.eventTracking || {}).google || {})),
+        },
+      },
       thankYouPage: { 
         ...defaults.thankYouPage, 
         ...(stored.thankYouPage || {}),
@@ -823,6 +893,7 @@ router.post("/seo", auth, allowRoles("admin", "user", "seo_manager"), async (req
       robotsTxt,
       structuredData,
       tiktokEvents,
+      eventTracking,
       thankYouPage,
       schemaType,
       localBusiness,
@@ -862,6 +933,9 @@ router.post("/seo", auth, allowRoles("admin", "user", "seo_manager"), async (req
     
     // TikTok Event Tracking settings
     if (tiktokEvents && typeof tiktokEvents === "object") value.tiktokEvents = tiktokEvents;
+
+    // General Event Tracking settings (per platform)
+    if (eventTracking && typeof eventTracking === "object") value.eventTracking = eventTracking;
     
     // Thank You Page settings
     if (thankYouPage && typeof thankYouPage === "object") value.thankYouPage = thankYouPage;
