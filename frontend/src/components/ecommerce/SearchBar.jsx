@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 export default function SearchBar({ 
   searchQuery, 
@@ -6,24 +6,49 @@ export default function SearchBar({
   sortBy, 
   onSortChange,
   showFilters,
-  onToggleFilters 
+  onToggleFilters,
+  debounceMs = 250
 }) {
   const [localQuery, setLocalQuery] = useState(searchQuery)
+  const didMountRef = useRef(false)
+  const debounceTimerRef = useRef(null)
 
   useEffect(() => {
     setLocalQuery(searchQuery)
   }, [searchQuery])
 
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    if (String(localQuery || '') === String(searchQuery || '')) {
+      return
+    }
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      onSearchChange(localQuery)
+    }, Math.max(0, debounceMs))
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [localQuery, searchQuery, debounceMs, onSearchChange])
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
     onSearchChange(localQuery)
   }
 
   const handleInputChange = (e) => {
     const value = e.target.value
     setLocalQuery(value)
-    // Real-time search for better UX
-    onSearchChange(value)
   }
 
   return (

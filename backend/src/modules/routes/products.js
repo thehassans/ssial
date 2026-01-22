@@ -20,6 +20,10 @@ const publicProductsCache = {
   TTL: 30000 // 30 seconds cache
 }
 
+function escapeRegExp(input) {
+  return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Resolve an uploads directory robustly across Plesk/PM2/systemd contexts
 function resolveUploadsDir(){
   try{
@@ -429,8 +433,10 @@ router.get('/public', async (req, res) => {
     }
     
     // Search filter
-    if (search) {
-      const searchRegex = new RegExp(search, 'i')
+    const rawSearch = typeof search === 'string' ? search.trim() : ''
+    if (rawSearch && rawSearch.length >= 2) {
+      const safe = escapeRegExp(rawSearch.slice(0, 64))
+      const searchRegex = new RegExp(safe, 'i')
       query.$or = [
         { name: searchRegex },
         { description: searchRegex },
@@ -521,8 +527,10 @@ router.get('/mobile', async (req, res) => {
     }
     
     // Search filter
-    if (search) {
-      const searchRegex = new RegExp(search, 'i')
+    const rawSearch = typeof search === 'string' ? search.trim() : ''
+    if (rawSearch && rawSearch.length >= 2) {
+      const safe = escapeRegExp(rawSearch.slice(0, 64))
+      const searchRegex = new RegExp(safe, 'i')
       query.$or = [
         { name: searchRegex },
         { description: searchRegex },

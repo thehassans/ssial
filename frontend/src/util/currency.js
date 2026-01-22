@@ -26,6 +26,7 @@ const DEFAULT = {
 
 let cache = null
 let ts = 0
+let inflight = null
 
 function resolveRole(){
   try{ const me = JSON.parse(localStorage.getItem('me')||'null'); return me?.role || null }catch{ return null }
@@ -79,17 +80,28 @@ export async function getCurrencyConfig(force=false){
     if (!force && cache && Date.now() - ts < 5 * 60 * 1000){
       return cache
     }
+    if (!force && inflight){
+      return inflight
+    }
     // Skip network fetch for roles/routes that typically lack permission
     if (!force && !shouldFetchCurrency()){
       cache = cache || { ...DEFAULT }
       ts = Date.now()
       return cache
     }
-    const raw = await apiGet('/api/settings/currency')
-    cache = normalizeCurrencyConfig(raw || {})
-    ts = Date.now()
-    return cache
+    inflight = (async () => {
+      const raw = await apiGet('/api/settings/currency')
+      cache = normalizeCurrencyConfig(raw || {})
+      ts = Date.now()
+      return cache
+    })()
+    try {
+      return await inflight
+    } finally {
+      inflight = null
+    }
   }catch{
+    inflight = null
     cache = cache || { ...DEFAULT }
     return cache
   }

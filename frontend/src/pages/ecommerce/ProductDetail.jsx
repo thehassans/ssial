@@ -304,13 +304,33 @@ const ProductDetail = () => {
     ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100) 
     : 0
 
+  const handleBack = () => {
+    try {
+      if (window.history && window.history.length > 1) {
+        navigate(-1)
+        return
+      }
+    } catch {}
+    navigate('/catalog')
+  }
+
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
       <Header onCartClick={() => setIsCartOpen(true)} />
       
       {/* Breadcrumb - Single Line */}
-      <div className="px-4 py-2">
-        <p className="text-[11px] text-gray-400">
+      <div className="px-4 py-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 active:scale-95 transition"
+          aria-label="Back"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <p className="text-[11px] text-gray-400 truncate">
           <Link to="/" className="hover:text-orange-500">Home</Link>
           <span className="mx-1">/</span>
           <Link to="/catalog" className="hover:text-orange-500">All Products</Link>

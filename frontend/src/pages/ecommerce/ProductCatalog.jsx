@@ -228,11 +228,14 @@ export default function ProductCatalog() {
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [filteredProducts, setFilteredProducts] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
   const [error, setError] = useState('')
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [categoryCounts, setCategoryCounts] = useState({})
   const [bannerImages, setBannerImages] = useState([])
+  const productsAbortRef = useRef(null)
+  const productsReqIdRef = useRef(0)
   
   // Edit mode
   const [editMode, setEditMode] = useState(false)
@@ -418,7 +421,6 @@ export default function ProductCatalog() {
 
   // Reset displayed products when filters change
   useEffect(() => {
-    setDisplayedProducts([])
     setCurrentPage(1)
     setHasMore(true)
   }, [selectedCategory, searchQuery, sortBy, filterType])
@@ -439,7 +441,7 @@ export default function ProductCatalog() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !isFetching && !initialLoading) {
           setLoadingMore(true)
           setCurrentPage(prev => prev + 1)
           setTimeout(() => setLoadingMore(false), 300)
@@ -449,11 +451,21 @@ export default function ProductCatalog() {
     )
     if (loaderRef.current) observer.observe(loaderRef.current)
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, loading])
+  }, [hasMore, loadingMore, isFetching, initialLoading])
 
   const loadProducts = async () => {
     try {
-      setLoading(true)
+      setError('')
+      setIsFetching(true)
+      const reqId = ++productsReqIdRef.current
+
+      try {
+        if (productsAbortRef.current) {
+          productsAbortRef.current.abort()
+        }
+      } catch {}
+      const controller = new AbortController()
+      productsAbortRef.current = controller
       
       // Build query parameters
       const params = new URLSearchParams()
@@ -461,10 +473,11 @@ export default function ProductCatalog() {
       if (searchQuery.trim()) params.append('search', searchQuery.trim())
       if (sortBy) params.append('sort', sortBy)
       if (filterType) params.append('filter', filterType)
-      params.append('page', currentPage.toString())
+      params.append('page', '1')
       params.append('limit', '10000') // Load all products for unlimited scrolling
       
-      const response = await apiGet(`/api/products/public?${params.toString()}`)
+      const response = await apiGet(`/api/products/public?${params.toString()}`, { signal: controller.signal })
+      if (reqId !== productsReqIdRef.current) return
       if (response?.products) {
         // Show all products - no country filtering, only currency conversion
         let filteredProducts = response.products
@@ -488,10 +501,13 @@ export default function ProductCatalog() {
         setPagination(filteredPagination)
       }
     } catch (error) {
+      if (error?.name === 'AbortError') return
       console.error('Failed to load products:', error)
+      setError('Failed to load products')
       toast.error('Failed to load products')
     } finally {
-      setLoading(false)
+      setIsFetching(false)
+      setInitialLoading(false)
     }
   }
 
@@ -672,7 +688,7 @@ export default function ProductCatalog() {
     </div>
   )
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: '#f4f4f4' }}>
         <Header onCartClick={() => setIsCartOpen(true)} />
@@ -870,7 +886,7 @@ export default function ProductCatalog() {
 
             {/* Products Grid */}
             <div className="product-grid-section" style={{ minHeight: '400px' }}>
-            {loading ? (
+            {(isFetching && products.length === 0) ? (
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="bg-gray-100 rounded-xl animate-pulse aspect-square" />
@@ -889,6 +905,12 @@ export default function ProductCatalog() {
               </div>
             ) : (
               <>
+                {isFetching && (
+                  <div className="flex items-center gap-3 text-sm text-gray-600 mb-3">
+                    <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                    <span>Updating results…</span>
+                  </div>
+                )}
                 <div className="taobao-grid">
                   {displayedProducts.map((product) => (
                     <ProductCardMini
