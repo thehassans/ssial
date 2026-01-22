@@ -24,7 +24,18 @@ class Analytics {
         return // Event disabled in settings
       }
       try {
-        window.ttq.track(eventName, params)
+        const ids = Array.isArray(window._tiktokPixelIds) ? window._tiktokPixelIds : []
+        if (ids.length && typeof window.ttq.instance === 'function') {
+          ids.forEach((id) => {
+            try {
+              window.ttq.instance(id).track(eventName, params)
+            } catch (e) {
+              console.warn('TikTok Pixel tracking error:', e)
+            }
+          })
+        } else {
+          window.ttq.track(eventName, params)
+        }
       } catch (e) {
         console.warn('TikTok Pixel tracking error:', e)
       }
@@ -403,13 +414,26 @@ class Analytics {
     // TikTok Pixel - CompletePayment for thank you page
     if (conversionPixels.tiktok && window.ttq) {
       try {
-        window.ttq.track('CompletePayment', {
+        const params = {
           content_type: 'product',
           content_ids: items.map(i => String(i.id || i.productId)),
           quantity: quantity,
           value: value,
           currency: 'SAR'
-        })
+        }
+
+        const ids = Array.isArray(window._tiktokPixelIds) ? window._tiktokPixelIds : []
+        if (ids.length && typeof window.ttq.instance === 'function') {
+          ids.forEach((id) => {
+            try {
+              window.ttq.instance(id).track('CompletePayment', params)
+            } catch (e) {
+              console.warn('TikTok thank you page tracking error:', e)
+            }
+          })
+        } else {
+          window.ttq.track('CompletePayment', params)
+        }
       } catch (e) {
         console.warn('TikTok thank you page tracking error:', e)
       }

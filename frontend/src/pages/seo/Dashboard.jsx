@@ -1319,6 +1319,9 @@ export default function SEODashboard() {
                       {/* Tracking Pixels */}
                       <div style={{ padding: '20px', background: theme.colors.bg, borderRadius: theme.radius.md, border: `1px solid ${theme.colors.border}` }}>
                         <h5 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 600, color: theme.colors.text }}>Tracking Pixels</h5>
+                        <p style={{ ...helpTextStyle, marginTop: '-8px', marginBottom: '16px' }}>
+                          You can add multiple IDs by separating them with commas or new lines.
+                        </p>
                         <div style={{ display: 'grid', gap: '16px' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <div>
@@ -1328,11 +1331,10 @@ export default function SEODashboard() {
                                   Facebook Pixel
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.facebookPixel || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], facebookPixel: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="123456789012345"
                               />
                             </div>
@@ -1359,11 +1361,10 @@ export default function SEODashboard() {
                                   Snapchat Pixel
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.snapchatPixel || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], snapchatPixel: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="xxxxxxxx-xxxx-xxxx"
                               />
                             </div>
@@ -1374,11 +1375,10 @@ export default function SEODashboard() {
                                   Pinterest Tag
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.pinterestTag || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], pinterestTag: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="123456789012"
                               />
                             </div>
@@ -1391,11 +1391,10 @@ export default function SEODashboard() {
                                   Twitter/X Pixel
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.twitterPixel || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], twitterPixel: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="tw-xxxxx-xxxxx"
                               />
                             </div>
@@ -1406,11 +1405,10 @@ export default function SEODashboard() {
                                   LinkedIn Tag
                                 </span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
                                 value={countrySeo[selectedCountry]?.linkedinTag || ''}
                                 onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], linkedinTag: e.target.value } })}
-                                style={inputStyle}
+                                style={{ ...inputStyle, minHeight: 70 }}
                                 placeholder="1234567"
                               />
                             </div>
@@ -1424,21 +1422,19 @@ export default function SEODashboard() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
                             <label style={labelStyle}>Google Analytics</label>
-                            <input
-                              type="text"
+                            <textarea
                               value={countrySeo[selectedCountry]?.googleAnalytics || ''}
                               onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], googleAnalytics: e.target.value } })}
-                              style={inputStyle}
+                              style={{ ...inputStyle, minHeight: 70 }}
                               placeholder="G-XXXXXXXXXX"
                             />
                           </div>
                           <div>
                             <label style={labelStyle}>Google Tag Manager</label>
-                            <input
-                              type="text"
+                            <textarea
                               value={countrySeo[selectedCountry]?.googleTagManager || ''}
                               onChange={e => setCountrySeo({ ...countrySeo, [selectedCountry]: { ...countrySeo[selectedCountry], googleTagManager: e.target.value } })}
-                              style={inputStyle}
+                              style={{ ...inputStyle, minHeight: 70 }}
                               placeholder="GTM-XXXXXXX"
                             />
                           </div>

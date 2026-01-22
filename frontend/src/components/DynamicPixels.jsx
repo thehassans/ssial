@@ -161,7 +161,18 @@ function trackAllPixelsPageView(pathname) {
   // TikTok Pixel page view
   if (window.ttq) {
     try {
-      window.ttq.page()
+      const ids = Array.isArray(window._tiktokPixelIds) ? window._tiktokPixelIds : []
+      if (ids.length && typeof window.ttq.instance === 'function') {
+        ids.forEach((id) => {
+          try {
+            window.ttq.instance(id).page()
+          } catch (e) {
+            console.warn('TikTok page tracking error:', e)
+          }
+        })
+      } else {
+        window.ttq.page()
+      }
     } catch (e) {
       console.warn('TikTok page tracking error:', e)
     }
