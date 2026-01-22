@@ -2,6 +2,20 @@ import { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { apiGet } from '../api.js'
 
+function normalizeIds(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean)
+  }
+  if (typeof value !== 'string') return []
+  const raw = value
+    .split(/[\n,]+/g)
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+  return Array.from(new Set(raw))
+}
+
 /**
  * DynamicPixels - Injects tracking pixels dynamically based on SEO settings
  * This component loads pixel IDs from the backend and injects the appropriate scripts
@@ -38,63 +52,70 @@ export default function DynamicPixels() {
         // Detect user's country from localStorage or default to Saudi Arabia
         const userCountry = localStorage.getItem('selectedCountry') || 'Saudi Arabia'
         const countryPixels = countrySeo[userCountry] || {}
+
+        const pick = (countryValue, globalValue) => {
+          const c = normalizeIds(countryValue)
+          if (c.length) return c
+          return normalizeIds(globalValue)
+        }
         
         // Merge global and country-specific settings (country takes priority)
         const pixels = {
-          tiktokPixel: countryPixels.tiktokPixel || seo.tiktokPixel,
-          facebookPixel: countryPixels.facebookPixel || seo.facebookPixel,
-          snapchatPixel: countryPixels.snapchatPixel || seo.snapchatPixel,
-          pinterestTag: countryPixels.pinterestTag || seo.pinterestTag,
-          twitterPixel: countryPixels.twitterPixel || seo.twitterPixel,
-          linkedinTag: countryPixels.linkedinTag || seo.linkedinTag,
-          googleAnalytics: countryPixels.googleAnalytics || seo.googleAnalytics,
-          googleTagManager: countryPixels.googleTagManager || seo.googleTagManager,
+          tiktokPixel: pick(countryPixels.tiktokPixel, seo.tiktokPixel),
+          facebookPixel: pick(countryPixels.facebookPixel, seo.facebookPixel),
+          snapchatPixel: pick(countryPixels.snapchatPixel, seo.snapchatPixel),
+          pinterestTag: pick(countryPixels.pinterestTag, seo.pinterestTag),
+          twitterPixel: pick(countryPixels.twitterPixel, seo.twitterPixel),
+          linkedinTag: pick(countryPixels.linkedinTag, seo.linkedinTag),
+          googleAnalytics: pick(countryPixels.googleAnalytics, seo.googleAnalytics),
+          googleTagManager: pick(countryPixels.googleTagManager, seo.googleTagManager),
         }
 
         console.log('Loading pixels for country:', userCountry, pixels)
 
         // TikTok Pixel
-        if (pixels.tiktokPixel && pixels.tiktokPixel.trim()) {
-          initTikTokPixel(pixels.tiktokPixel.trim())
-          // Store pixel ID and event settings for later use
-          window._tiktokPixelId = pixels.tiktokPixel.trim()
+        if (pixels.tiktokPixel.length) {
+          initTikTokPixels(pixels.tiktokPixel)
+          // Store pixel IDs and event settings for later use
+          window._tiktokPixelIds = pixels.tiktokPixel
+          window._tiktokPixelId = pixels.tiktokPixel[0]
           window._tiktokEvents = seo.tiktokEvents || {}
           window._thankYouPageSettings = seo.thankYouPage || {}
         }
 
         // Facebook/Meta Pixel
-        if (pixels.facebookPixel && pixels.facebookPixel.trim()) {
-          initFacebookPixel(pixels.facebookPixel.trim())
+        if (pixels.facebookPixel.length) {
+          initFacebookPixels(pixels.facebookPixel)
         }
 
         // Snapchat Pixel
-        if (pixels.snapchatPixel && pixels.snapchatPixel.trim()) {
-          initSnapchatPixel(pixels.snapchatPixel.trim())
+        if (pixels.snapchatPixel.length) {
+          initSnapchatPixels(pixels.snapchatPixel)
         }
 
         // Twitter/X Pixel
-        if (pixels.twitterPixel && pixels.twitterPixel.trim()) {
-          initTwitterPixel(pixels.twitterPixel.trim())
+        if (pixels.twitterPixel.length) {
+          initTwitterPixels(pixels.twitterPixel)
         }
 
         // Pinterest Tag
-        if (pixels.pinterestTag && pixels.pinterestTag.trim()) {
-          initPinterestTag(pixels.pinterestTag.trim())
+        if (pixels.pinterestTag.length) {
+          initPinterestTags(pixels.pinterestTag)
         }
 
         // LinkedIn Tag
-        if (pixels.linkedinTag && pixels.linkedinTag.trim()) {
-          initLinkedInTag(pixels.linkedinTag.trim())
+        if (pixels.linkedinTag.length) {
+          initLinkedInTags(pixels.linkedinTag)
         }
 
         // Google Analytics
-        if (pixels.googleAnalytics && pixels.googleAnalytics.trim()) {
-          initGoogleAnalytics(pixels.googleAnalytics.trim())
+        if (pixels.googleAnalytics.length) {
+          initGoogleAnalyticsIds(pixels.googleAnalytics)
         }
 
         // Google Tag Manager
-        if (pixels.googleTagManager && pixels.googleTagManager.trim()) {
-          initGoogleTagManager(pixels.googleTagManager.trim())
+        if (pixels.googleTagManager.length) {
+          initGoogleTagManagerIds(pixels.googleTagManager)
         }
 
         // Hotjar (global only)
@@ -184,11 +205,8 @@ function trackAllPixelsPageView(pathname) {
 }
 
 // TikTok Pixel initialization
-function initTikTokPixel(pixelId) {
-  if (window.ttq) {
-    console.log('TikTok Pixel already loaded')
-    return
-  }
+function ensureTikTokBaseLoaded() {
+  if (window.ttq) return
 
   ;(function(w, d, t) {
     w.TiktokAnalyticsObject = t
@@ -212,12 +230,12 @@ function initTikTokPixel(pixelId) {
       var r = "https://analytics.tiktok.com/i18n/pixel/events.js"
       var o = n && n.partner
       ttq._i = ttq._i || {}
-      ttq._i[e] = []
+      ttq._i[e] = ttq._i[e] || []
       ttq._i[e]._u = r
       ttq._t = ttq._t || {}
-      ttq._t[e] = +new Date()
+      ttq._t[e] = ttq._t[e] || +new Date()
       ttq._o = ttq._o || {}
-      ttq._o[e] = n || {}
+      ttq._o[e] = ttq._o[e] || n || {}
       var i = document.createElement("script")
       i.type = "text/javascript"
       i.async = true
@@ -225,19 +243,34 @@ function initTikTokPixel(pixelId) {
       var a = document.getElementsByTagName("script")[0]
       a.parentNode.insertBefore(i, a)
     }
-    ttq.load(pixelId)
-    ttq.page()
   })(window, document, 'ttq')
-  
-  console.log('TikTok Pixel initialized:', pixelId)
+}
+
+function initTikTokPixels(pixelIds) {
+  ensureTikTokBaseLoaded()
+  if (!window.ttq) return
+
+  pixelIds.forEach((id) => {
+    try {
+      window.ttq.load(id)
+      if (typeof window.ttq.instance === 'function') {
+        window.ttq.instance(id).page()
+      }
+    } catch (e) {
+      console.warn('TikTok Pixel init error:', e)
+    }
+  })
+
+  try {
+    window.ttq.page()
+  } catch {}
+
+  console.log('TikTok Pixel initialized:', pixelIds)
 }
 
 // Facebook/Meta Pixel initialization
-function initFacebookPixel(pixelId) {
-  if (window.fbq) {
-    console.log('Facebook Pixel already loaded')
-    return
-  }
+function ensureFacebookBaseLoaded() {
+  if (window.fbq) return
 
   ;(function(f, b, e, v, n, t, s) {
     if (f.fbq) return
@@ -255,19 +288,30 @@ function initFacebookPixel(pixelId) {
     s = b.getElementsByTagName(e)[0]
     s.parentNode.insertBefore(t, s)
   })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js')
-  
-  window.fbq('init', pixelId)
-  window.fbq('track', 'PageView')
-  
-  console.log('Facebook Pixel initialized:', pixelId)
+}
+
+function initFacebookPixels(pixelIds) {
+  ensureFacebookBaseLoaded()
+  if (!window.fbq) return
+
+  pixelIds.forEach((id) => {
+    try {
+      window.fbq('init', id)
+    } catch (e) {
+      console.warn('Facebook Pixel init error:', e)
+    }
+  })
+
+  try {
+    window.fbq('track', 'PageView')
+  } catch {}
+
+  console.log('Facebook Pixel initialized:', pixelIds)
 }
 
 // Snapchat Pixel initialization
-function initSnapchatPixel(pixelId) {
-  if (window.snaptr) {
-    console.log('Snapchat Pixel already loaded')
-    return
-  }
+function ensureSnapchatBaseLoaded() {
+  if (window.snaptr) return
 
   ;(function(e, t, n) {
     if (e.snaptr) return
@@ -282,19 +326,30 @@ function initSnapchatPixel(pixelId) {
     var u = t.getElementsByTagName(s)[0]
     u.parentNode.insertBefore(r, u)
   })(window, document, 'https://sc-static.net/scevent.min.js')
-  
-  window.snaptr('init', pixelId, {})
-  window.snaptr('track', 'PAGE_VIEW')
-  
-  console.log('Snapchat Pixel initialized:', pixelId)
+}
+
+function initSnapchatPixels(pixelIds) {
+  ensureSnapchatBaseLoaded()
+  if (!window.snaptr) return
+
+  pixelIds.forEach((id) => {
+    try {
+      window.snaptr('init', id, {})
+    } catch (e) {
+      console.warn('Snapchat Pixel init error:', e)
+    }
+  })
+
+  try {
+    window.snaptr('track', 'PAGE_VIEW')
+  } catch {}
+
+  console.log('Snapchat Pixel initialized:', pixelIds)
 }
 
 // Twitter/X Pixel initialization
-function initTwitterPixel(pixelId) {
-  if (window.twq) {
-    console.log('Twitter Pixel already loaded')
-    return
-  }
+function ensureTwitterBaseLoaded() {
+  if (window.twq) return
 
   ;(function(e, t, n, s, u, a) {
     e.twq || (s = e.twq = function() {
@@ -302,18 +357,26 @@ function initTwitterPixel(pixelId) {
     }, s.version = '1.1', s.queue = [], u = t.createElement(n), u.async = true, u.src = 'https://static.ads-twitter.com/uwt.js',
     a = t.getElementsByTagName(n)[0], a.parentNode.insertBefore(u, a))
   })(window, document, 'script')
-  
-  window.twq('config', pixelId)
-  
-  console.log('Twitter Pixel initialized:', pixelId)
+}
+
+function initTwitterPixels(pixelIds) {
+  ensureTwitterBaseLoaded()
+  if (!window.twq) return
+
+  pixelIds.forEach((id) => {
+    try {
+      window.twq('config', id)
+    } catch (e) {
+      console.warn('Twitter Pixel init error:', e)
+    }
+  })
+
+  console.log('Twitter Pixel initialized:', pixelIds)
 }
 
 // Pinterest Tag initialization
-function initPinterestTag(tagId) {
-  if (window.pintrk) {
-    console.log('Pinterest Tag already loaded')
-    return
-  }
+function ensurePinterestBaseLoaded() {
+  if (window.pintrk) return
 
   ;(function(e) {
     if (!window.pintrk) {
@@ -330,23 +393,32 @@ function initPinterestTag(tagId) {
       r.parentNode.insertBefore(t, r)
     }
   })()
-  
-  window.pintrk('load', tagId)
-  window.pintrk('page')
-  
-  console.log('Pinterest Tag initialized:', tagId)
+}
+
+function initPinterestTags(tagIds) {
+  ensurePinterestBaseLoaded()
+  if (!window.pintrk) return
+
+  tagIds.forEach((id) => {
+    try {
+      window.pintrk('load', id)
+    } catch (e) {
+      console.warn('Pinterest Tag init error:', e)
+    }
+  })
+
+  try {
+    window.pintrk('page')
+  } catch {}
+
+  console.log('Pinterest Tag initialized:', tagIds)
 }
 
 // LinkedIn Insight Tag initialization
-function initLinkedInTag(partnerId) {
-  if (window._linkedin_data_partner_ids) {
-    console.log('LinkedIn Tag already loaded')
-    return
-  }
+function ensureLinkedInBaseLoaded() {
+  if (window._linkedin_insight_tag_loaded) return
+  window._linkedin_insight_tag_loaded = true
 
-  window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || []
-  window._linkedin_data_partner_ids.push(partnerId)
-  
   ;(function(l) {
     if (!l) {
       window.lintrk = function(a, b) { window.lintrk.q.push([a, b]) }
@@ -359,34 +431,53 @@ function initLinkedInTag(partnerId) {
     b.src = 'https://snap.licdn.com/li.lms-analytics/insight.min.js'
     s.parentNode.insertBefore(b, s)
   })(window.lintrk)
-  
-  console.log('LinkedIn Tag initialized:', partnerId)
+}
+
+function initLinkedInTags(partnerIds) {
+  window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || []
+  partnerIds.forEach((id) => {
+    if (!window._linkedin_data_partner_ids.includes(id)) {
+      window._linkedin_data_partner_ids.push(id)
+    }
+  })
+
+  ensureLinkedInBaseLoaded()
+  console.log('LinkedIn Tag initialized:', partnerIds)
 }
 
 // Google Analytics (GA4) initialization
-function initGoogleAnalytics(measurementId) {
-  if (window.gtag) {
-    console.log('Google Analytics already loaded')
-    return
-  }
+function ensureGoogleAnalyticsBaseLoaded(primaryMeasurementId) {
+  if (window.gtag) return
 
   const script = document.createElement('script')
   script.async = true
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${primaryMeasurementId}`
   document.head.appendChild(script)
-  
+
   window.dataLayer = window.dataLayer || []
   window.gtag = function() { window.dataLayer.push(arguments) }
   window.gtag('js', new Date())
-  window.gtag('config', measurementId)
-  
-  console.log('Google Analytics initialized:', measurementId)
+}
+
+function initGoogleAnalyticsIds(measurementIds) {
+  if (!measurementIds.length) return
+  ensureGoogleAnalyticsBaseLoaded(measurementIds[0])
+  if (!window.gtag) return
+
+  measurementIds.forEach((id) => {
+    try {
+      window.gtag('config', id)
+    } catch (e) {
+      console.warn('Google Analytics init error:', e)
+    }
+  })
+
+  console.log('Google Analytics initialized:', measurementIds)
 }
 
 // Google Tag Manager initialization
 function initGoogleTagManager(containerId) {
   if (window.google_tag_manager && window.google_tag_manager[containerId]) {
-    console.log('Google Tag Manager already loaded')
     return
   }
 
@@ -400,8 +491,18 @@ function initGoogleTagManager(containerId) {
     j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl
     f.parentNode.insertBefore(j, f)
   })(window, document, 'script', 'dataLayer', containerId)
-  
+
   console.log('Google Tag Manager initialized:', containerId)
+}
+
+function initGoogleTagManagerIds(containerIds) {
+  containerIds.forEach((id) => {
+    try {
+      initGoogleTagManager(id)
+    } catch (e) {
+      console.warn('Google Tag Manager init error:', e)
+    }
+  })
 }
 
 // Hotjar initialization

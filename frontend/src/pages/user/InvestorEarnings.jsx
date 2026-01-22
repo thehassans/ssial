@@ -25,7 +25,7 @@ export default function InvestorEarnings() {
   async function loadData() {
     setLoading(true)
     try {
-      let url = '/api/investors/earnings'
+      let url = '/api/finance/investors/earnings'
       const params = new URLSearchParams()
       if (filter !== 'all') params.set('status', filter)
       if (dateRange.from) params.set('from', dateRange.from)
@@ -34,7 +34,7 @@ export default function InvestorEarnings() {
 
       const [earningsRes, payoutsRes] = await Promise.all([
         apiGet(url).catch(() => ({ investors: [], stats: {} })),
-        apiGet('/api/investors/payout-requests').catch(() => ({ requests: [] }))
+        apiGet('/api/finance/investors/payout-requests').catch(() => ({ requests: [] }))
       ])
 
       setInvestors(earningsRes.investors || [])
@@ -56,7 +56,7 @@ export default function InvestorEarnings() {
   async function handlePayoutAction(requestId, action) {
     setProcessingId(requestId)
     try {
-      await apiPost(`/api/investors/payout-requests/${requestId}/${action}`)
+      await apiPost(`/api/finance/investors/payout-requests/${requestId}/${action}`)
       toast.success(`Payout ${action === 'approve' ? 'approved' : 'rejected'} successfully`)
       loadData()
     } catch (err) {

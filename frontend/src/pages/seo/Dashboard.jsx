@@ -283,9 +283,20 @@ export default function SEODashboard() {
     }
   }
 
+  const hasAnyPixelSetting = (field) => {
+    const globalValue = seo?.[field]
+    if (typeof globalValue === 'string' && globalValue.trim()) return true
+    const cs = countrySeo && typeof countrySeo === 'object' ? countrySeo : {}
+    return Object.values(cs).some((v) => {
+      const val = v?.[field]
+      return typeof val === 'string' && val.trim()
+    })
+  }
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Icons.overview },
     { id: 'meta', label: 'Meta Tags', icon: Icons.meta },
+    { id: 'pixels', label: 'Pixels', icon: Icons.pixels },
     { id: 'countries', label: 'Country SEO', icon: Icons.globe },
     { id: 'events', label: 'Event Tracking', icon: Icons.events },
     { id: 'thankyou', label: 'Thank You', icon: Icons.thankYou },
@@ -661,6 +672,79 @@ export default function SEODashboard() {
           </div>
         )}
 
+        {/* Pixels Tab */}
+        {activeTab === 'pixels' && (
+          <div>
+            <div style={cardStyle}>
+              <h3 style={{ margin: '0 0 24px', color: theme.colors.text, fontSize: '16px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                Global Tracking Pixels
+              </h3>
+              <p style={{ ...helpTextStyle, marginTop: '-16px', marginBottom: '20px' }}>
+                You can add multiple IDs by separating them with commas or new lines.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <div>
+                  <label style={labelStyle}>Facebook Pixel ID(s)</label>
+                  <textarea
+                    value={seo.facebookPixel}
+                    onChange={e => setSeo({ ...seo, facebookPixel: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="123456789012345"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>TikTok Pixel ID(s)</label>
+                  <textarea
+                    value={seo.tiktokPixel}
+                    onChange={e => setSeo({ ...seo, tiktokPixel: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="D5LMN53C77U4MKNK3QS0"
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Snapchat Pixel ID(s)</label>
+                  <textarea
+                    value={seo.snapchatPixel}
+                    onChange={e => setSeo({ ...seo, snapchatPixel: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="xxxxxxxx-xxxx-xxxx"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Pinterest Tag ID(s)</label>
+                  <textarea
+                    value={seo.pinterestTag}
+                    onChange={e => setSeo({ ...seo, pinterestTag: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="123456789012"
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Twitter/X Pixel ID(s)</label>
+                  <textarea
+                    value={seo.twitterPixel}
+                    onChange={e => setSeo({ ...seo, twitterPixel: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="tw-xxxxx-xxxxx"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>LinkedIn Partner ID(s)</label>
+                  <textarea
+                    value={seo.linkedinTag}
+                    onChange={e => setSeo({ ...seo, linkedinTag: e.target.value })}
+                    style={{ ...inputStyle, minHeight: 70 }}
+                    placeholder="1234567"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Event Tracking Tab */}
         {activeTab === 'events' && (
           <div>
@@ -964,11 +1048,11 @@ export default function SEODashboard() {
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                 {[
-                  { key: 'tiktok', label: 'TikTok Pixel', color: '#000', configured: !!seo.tiktokPixel },
-                  { key: 'facebook', label: 'Facebook Pixel', color: '#1877f2', configured: !!seo.facebookPixel },
-                  { key: 'snapchat', label: 'Snapchat Pixel', color: '#FFFC00', configured: !!seo.snapchatPixel },
-                  { key: 'pinterest', label: 'Pinterest Tag', color: '#E60023', configured: !!seo.pinterestTag },
-                  { key: 'google', label: 'Google Analytics', color: '#4285f4', configured: !!seo.googleAnalytics },
+                  { key: 'tiktok', label: 'TikTok Pixel', color: '#000', configured: hasAnyPixelSetting('tiktokPixel') },
+                  { key: 'facebook', label: 'Facebook Pixel', color: '#1877f2', configured: hasAnyPixelSetting('facebookPixel') },
+                  { key: 'snapchat', label: 'Snapchat Pixel', color: '#FFFC00', configured: hasAnyPixelSetting('snapchatPixel') },
+                  { key: 'pinterest', label: 'Pinterest Tag', color: '#E60023', configured: hasAnyPixelSetting('pinterestTag') },
+                  { key: 'google', label: 'Google Analytics', color: '#4285f4', configured: hasAnyPixelSetting('googleAnalytics') },
                 ].map(pixel => (
                   <label
                     key={pixel.key}
