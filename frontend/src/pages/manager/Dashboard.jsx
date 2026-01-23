@@ -46,8 +46,16 @@ export default function ManagerDashboard(){
 
   const assignedList = useMemo(()=>{
     const arr = Array.isArray(me?.assignedCountries) && me.assignedCountries.length ? me.assignedCountries : (me?.assignedCountry ? [me.assignedCountry] : [])
-    // Default to all if none assigned
-    return arr.length ? arr : ['KSA','UAE','Oman','Bahrain','India','Kuwait','Qatar','Pakistan','Jordan','USA','UK','Canada','Australia']
+    // If assigned countries/country set, use them; otherwise fall back to manager's own country field (normalized)
+    if (arr.length) return arr
+    // Normalize manager's country field (KSA -> Saudi Arabia for consistency with backend)
+    const ownCountry = me?.country
+    if (ownCountry) {
+      const normalized = ownCountry === 'KSA' ? 'Saudi Arabia' : (ownCountry === 'United Arab Emirates' ? 'UAE' : ownCountry)
+      return [normalized]
+    }
+    // Absolute fallback: all countries
+    return ['KSA','UAE','Oman','Bahrain','India','Kuwait','Qatar','Pakistan','Jordan','USA','UK','Canada','Australia']
   }, [me])
 
   // Country helpers for flags/currencies and unified metrics
