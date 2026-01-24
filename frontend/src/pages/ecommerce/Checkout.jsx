@@ -16,6 +16,7 @@ export default function Checkout() {
   const [step, setStep] = useState(1) // 1: Customer Info, 2: Payment, 3: Confirmation
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const toast = useToast()
 
   // Customer Information
@@ -69,6 +70,15 @@ export default function Checkout() {
     cvv: '',
     cardholderName: ''
   })
+
+  useEffect(() => {
+    const raw = String(searchParams?.get('method') || '').toLowerCase()
+    const allowed = raw === 'mada' || raw === 'applepay' || raw === 'stcpay'
+    if (!allowed) return
+    setPaymentInfo(prev => ({ ...prev, method: raw }))
+    moyasarInitialized.current = false
+    setMoyasarWebOrderId('')
+  }, [searchParams])
 
   // PayPal state
   const [paypalLoading, setPaypalLoading] = useState(false)
@@ -255,7 +265,8 @@ export default function Checkout() {
     const customerToken = localStorage.getItem('token')
     if (!customerToken) {
       toast.error('Please login to continue checkout')
-      localStorage.setItem('checkout_redirect', '/checkout')
+      const qs = String(window.location.search || '')
+      localStorage.setItem('checkout_redirect', `/checkout${qs}`)
       navigate('/customer/login', { replace: true })
       return
     }
@@ -294,7 +305,7 @@ export default function Checkout() {
 
   // Load cart items on component mount
   useEffect(() => {
-    const savedCart = localStorage.getItem('checkout_cart')
+    const savedCart = localStorage.getItem('checkout_cart') || localStorage.getItem('shopping_cart')
     if (savedCart) {
       try {
         const items = JSON.parse(savedCart)

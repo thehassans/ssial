@@ -26,6 +26,7 @@ export default function CartPage() {
   const [location, setLocation] = useState({ lat: null, lng: null })
   const [paymentMethod, setPaymentMethod] = useState('cod') // cod, stripe, paypal, applepay, googlepay
   const [paymentConfig, setPaymentConfig] = useState({ stripe: { enabled: false }, paypal: { enabled: false }, cod: { enabled: true }, applepay: { enabled: false }, googlepay: { enabled: false } })
+  const [moyasarConfig, setMoyasarConfig] = useState(null)
   
   // Apple Pay supported countries
   const APPLE_PAY_COUNTRIES = ['SA', 'AE', 'OM', 'BH', 'KW', 'QA', 'GB', 'CA', 'AU']
@@ -171,8 +172,9 @@ export default function CartPage() {
     // Load payment config and initialize Stripe
     Promise.all([
       apiGet('/api/ecommerce/payments/config').catch(() => ({})),
-      apiGet('/api/settings/payment-methods').catch(() => ({ methods: {} }))
-    ]).then(([cfg, methodSettings]) => {
+      apiGet('/api/settings/payment-methods').catch(() => ({ methods: {} })),
+      apiGet('/api/moyasar/config').catch(() => ({}))
+    ]).then(([cfg, methodSettings, mcfg]) => {
       if (!alive) return
       // Merge payment method enabled/disabled settings
       const methods = methodSettings?.methods || {}
@@ -185,6 +187,7 @@ export default function CartPage() {
         googlepay: { ...cfg.googlepay, enabled: methods.googlepay?.enabled ?? cfg.googlepay?.enabled ?? false }
       }
       setPaymentConfig(mergedConfig)
+      setMoyasarConfig(mcfg && mcfg.publishableKey ? mcfg : null)
       // Load Stripe.js if enabled
       if (mergedConfig.stripe?.enabled && cfg.stripe?.publishableKey) {
         loadStripeJs(cfg.stripe.publishableKey)
@@ -664,6 +667,13 @@ export default function CartPage() {
 
   async function submitOrder() {
     if (!validateForm()) return
+
+    if (paymentMethod === 'mada' || paymentMethod === 'stcpay' || paymentMethod === 'moyasar_applepay') {
+      const methodParam = paymentMethod === 'moyasar_applepay' ? 'applepay' : paymentMethod
+      try { localStorage.setItem('checkout_redirect', `/checkout?method=${encodeURIComponent(methodParam)}`) } catch {}
+      navigate(`/checkout?method=${encodeURIComponent(methodParam)}`)
+      return
+    }
     
     // Validate Stripe payment
     if (paymentMethod === 'stripe') {
@@ -1061,6 +1071,45 @@ export default function CartPage() {
                       </div>
                     )}
 
+                    {form.country === 'SA' && moyasarConfig?.publishableKey && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: paymentMethod === 'mada' ? '#fff7ed' : '#f8fafc', border: paymentMethod === 'mada' ? '2px solid #f97316' : '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer' }}>
+                        <input type="radio" name="payment" value="mada" checked={paymentMethod === 'mada'} onChange={() => setPaymentMethod('mada')} style={{ width: 16, height: 16, accentColor: '#f97316' }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #22c55e, #16a34a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>Mada</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>Saudi debit cards</div>
+                        </div>
+                      </label>
+                    )}
+
+                    {form.country === 'SA' && moyasarConfig?.publishableKey && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: paymentMethod === 'moyasar_applepay' ? '#fff7ed' : '#f8fafc', border: paymentMethod === 'moyasar_applepay' ? '2px solid #f97316' : '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer' }}>
+                        <input type="radio" name="payment" value="moyasar_applepay" checked={paymentMethod === 'moyasar_applepay'} onChange={() => setPaymentMethod('moyasar_applepay')} style={{ width: 16, height: 16, accentColor: '#f97316' }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #0f172a, #334155)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>Apple Pay</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>Moyasar</div>
+                        </div>
+                      </label>
+                    )}
+
+                    {form.country === 'SA' && moyasarConfig?.publishableKey && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: paymentMethod === 'stcpay' ? '#fff7ed' : '#f8fafc', border: paymentMethod === 'stcpay' ? '2px solid #f97316' : '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer' }}>
+                        <input type="radio" name="payment" value="stcpay" checked={paymentMethod === 'stcpay'} onChange={() => setPaymentMethod('stcpay')} style={{ width: 16, height: 16, accentColor: '#f97316' }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #a855f7, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>STC Pay</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>Wallet (OTP)</div>
+                        </div>
+                      </label>
+                    )}
+
                     {/* PayPal */}
                     <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', background: paymentMethod === 'paypal' ? '#fff7ed' : '#f8fafc', border: paymentMethod === 'paypal' ? '2px solid #f97316' : '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer' }}>
                       <input type="radio" name="payment" value="paypal" checked={paymentMethod === 'paypal'} onChange={() => setPaymentMethod('paypal')} style={{ width: 16, height: 16, accentColor: '#f97316' }} />
@@ -1190,7 +1239,16 @@ export default function CartPage() {
                 </div>
                 
                 <button 
-                  onClick={() => navigate('/checkout')}
+                  onClick={() => {
+                    if (paymentMethod === 'mada' || paymentMethod === 'stcpay' || paymentMethod === 'moyasar_applepay') {
+                      if (!validateForm()) return
+                      const methodParam = paymentMethod === 'moyasar_applepay' ? 'applepay' : paymentMethod
+                      try { localStorage.setItem('checkout_redirect', `/checkout?method=${encodeURIComponent(methodParam)}`) } catch {}
+                      navigate(`/checkout?method=${encodeURIComponent(methodParam)}`)
+                      return
+                    }
+                    submitOrder()
+                  }}
                   disabled={isLoading}
                   style={{
                     width: '100%',
@@ -1205,7 +1263,7 @@ export default function CartPage() {
                     boxShadow: '0 4px 14px rgba(249, 115, 22, 0.3)'
                   }}
                 >
-                  {isLoading ? 'Loading...' : 'Checkout'}
+                  {isLoading ? 'Placing Order...' : (paymentMethod === 'mada' || paymentMethod === 'stcpay' || paymentMethod === 'moyasar_applepay' ? 'Continue to Payment' : 'Place Order')}
                 </button>
               </div>
             </div>
