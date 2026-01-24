@@ -79,6 +79,19 @@ const OrderSchema = new mongoose.Schema(
     inventoryAdjusted: { type: Boolean, default: false },
     inventoryAdjustedAt: { type: Date },
 
+    // Manager stock allocation tracking (optional)
+    managerStockConsumed: {
+      ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      managerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      country: { type: String },
+      items: [
+        {
+          productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+          quantity: { type: Number, default: 1 },
+        },
+      ],
+    },
+
     // Returns / delivery info
     deliveryNotes: { type: String },
     returnReason: { type: String },

@@ -97,6 +97,7 @@ const ManagerDriverFinances = lazy(() => import('./pages/manager/DriverFinances.
 const ManagerDriverAmounts = lazy(() => import('./pages/manager/DriverAmounts.jsx'))
 const ManagerCreateDriver = lazy(() => import('./pages/manager/CreateDriver.jsx'))
 const ManagerReturnedOrders = lazy(() => import('./pages/manager/ReturnedOrders.jsx'))
+const ManagerMyStock = lazy(() => import('./pages/manager/MyStock.jsx'))
 const ManagerMe = lazy(() => import('./pages/manager/Me.jsx'))
 
 // Driver pages
@@ -651,6 +652,7 @@ export default function App() {
               <Route path="inhouse-products" element={<InhouseProducts />} />
               <Route path="products" element={<UserProducts />} />
               <Route path="products/:id" element={<RequireManagerPerm perm="canAccessProductDetail"><UserProductDetail /></RequireManagerPerm>} />
+              <Route path="my-stock" element={<ManagerMyStock />} />
               <Route path="expenses" element={<Navigate to="/manager" replace />} />
               <Route path="me" element={<ManagerMe />} />
             </Route>

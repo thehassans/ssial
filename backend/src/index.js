@@ -33,7 +33,7 @@ import referencesRoutes from "./modules/routes/references.js";
 import confirmersRoutes from "./modules/routes/confirmers.js";
 import couponsRoutes from "./modules/routes/coupons.js";
 import moyasarRoutes from "./modules/routes/moyasar.js";
-
+import managerStockRoutes from "./modules/routes/managerStock.js";
 
 dotenv.config();
 
@@ -177,6 +177,7 @@ app.use("/api/settings/shopify", shopifyOAuthRoutes); // OAuth app config routes
 app.use("/api/settings/website", websiteSettingsRoutes);
 app.use("/api/dropshippers", dropshipperRoutes);
 app.use("/api/dropshippers/shopify", dropshipperShopifyRoutes);
+app.use("/api/manager-stock", managerStockRoutes);
 app.use("/api/shopify", shopifyOAuthRoutes);
 app.use("/api/reviews", reviewsRoutes);
 app.use("/api/commissioners", commissionersRoutes);

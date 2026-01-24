@@ -5,6 +5,7 @@ import path from "path";
 import Order from "../models/Order.js";
 import WebOrder from "../models/WebOrder.js";
 import Product from "../models/Product.js";
+import ManagerProductStock from "../models/ManagerProductStock.js";
 import Counter from "../models/Counter.js";
 import { auth, allowRoles } from "../middleware/auth.js";
 import User from "../models/User.js";
@@ -16,6 +17,25 @@ import { assignInvestorProfitToOrder, preAssignInvestorToOrder } from "../servic
 const router = express.Router();
 
 const summaryCache = new Map();
+
+function normalizeManagerStockCountry(country) {
+  const c = String(country || "").trim();
+  const u = c.toUpperCase();
+  if (u === "UAE" || u === "UNITED ARAB EMIRATES" || u === "AE") return "UAE";
+  if (u === "OMAN" || u === "OM") return "Oman";
+  if (u === "KSA" || u === "SAUDI ARABIA" || u === "SA") return "KSA";
+  if (u === "BAHRAIN" || u === "BH") return "Bahrain";
+  if (u === "INDIA" || u === "IN") return "India";
+  if (u === "KUWAIT" || u === "KW") return "Kuwait";
+  if (u === "QATAR" || u === "QA") return "Qatar";
+  if (u === "PAKISTAN" || u === "PK") return "Pakistan";
+  if (u === "JORDAN" || u === "JO") return "Jordan";
+  if (u === "UNITED STATES" || u === "UNITED STATES OF AMERICA" || u === "US" || u === "USA") return "USA";
+  if (u === "UNITED KINGDOM" || u === "GB" || u === "UK") return "UK";
+  if (u === "CANADA" || u === "CA") return "Canada";
+  if (u === "AUSTRALIA" || u === "AU") return "Australia";
+  return c;
+}
 
 // Helper: Recalculate dropshipper profit for a single order
 async function recalculateDropshipperProfitForOrder(order) {
@@ -559,52 +579,144 @@ router.post(
     }
 
     // Check stock availability in the order country BEFORE creating the order
-    const getCountryStock = (product, country) => {
-      if (!product.stockByCountry) return product.stockQty || 0;
-      const c = String(country || "");
-      if (c === "UAE" || c === "United Arab Emirates")
-        return product.stockByCountry.UAE || 0;
-      if (c === "Oman" || c === "OM") return product.stockByCountry.Oman || 0;
-      if (c === "KSA" || c === "Saudi Arabia")
-        return product.stockByCountry.KSA || 0;
-      if (c === "Bahrain" || c === "BH")
-        return product.stockByCountry.Bahrain || 0;
-      if (c === "India" || c === "IN") return product.stockByCountry.India || 0;
-      if (c === "Kuwait" || c === "KW")
-        return product.stockByCountry.Kuwait || 0;
-      if (c === "Qatar" || c === "QA") return product.stockByCountry.Qatar || 0;
-      return 0;
-    };
+    const countryKeyForStock = normalizeManagerStockCountry(orderCountry);
+    if (req.user.role === "manager") {
+      const mgrOwner = await User.findById(req.user.id).select("createdBy").lean();
+      const ownerId = String(mgrOwner?.createdBy || "");
+      if (!ownerId) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
 
-    if (normItems.length > 0) {
-      // Check stock for multi-item orders
-      for (const it of normItems) {
-        const p = await Product.findById(it.productId);
-        if (!p) continue;
-        const requestedQty = Math.max(1, Number(it.quantity || 1));
-        const availableStock = getCountryStock(p, orderCountry);
+      const checkManagerStock = async (productId, requestedQty, productName) => {
+        const row = await ManagerProductStock.findOne({
+          ownerId,
+          managerId: req.user.id,
+          productId,
+          country: countryKeyForStock,
+        })
+          .select("qty")
+          .lean();
+        const availableStock = Number(row?.qty || 0);
         if (availableStock < requestedQty) {
           return res.status(400).json({
-            message: `No stock available for ${p.name} in ${orderCountry}. Available: ${availableStock}, Requested: ${requestedQty}`,
+            message: `No manager stock available for ${productName} in ${orderCountry}. Available: ${availableStock}, Requested: ${requestedQty}`,
             error: "INSUFFICIENT_STOCK",
-            product: p.name,
+            product: productName,
             available: availableStock,
             requested: requestedQty,
           });
         }
+        return null;
+      };
+
+      if (normItems.length > 0) {
+        for (const it of normItems) {
+          const p = await Product.findById(it.productId).select("name").lean();
+          const requestedQty = Math.max(1, Number(it.quantity || 1));
+          const errRes = await checkManagerStock(it.productId, requestedQty, p?.name || "Product");
+          if (errRes) return errRes;
+        }
+      } else if (prod) {
+        const requestedQty = Math.max(1, Number(quantity || 1));
+        const errRes = await checkManagerStock(prod._id, requestedQty, prod?.name || "Product");
+        if (errRes) return errRes;
       }
-    } else if (prod) {
-      // Check stock for single product order
-      const requestedQty = Math.max(1, Number(quantity || 1));
-      const availableStock = getCountryStock(prod, orderCountry);
-      if (availableStock < requestedQty) {
-        return res.status(400).json({
-          message: `No stock available for ${prod.name} in ${orderCountry}. Available: ${availableStock}, Requested: ${requestedQty}`,
-          error: "INSUFFICIENT_STOCK",
-          product: prod.name,
-          available: availableStock,
-          requested: requestedQty,
-        });
+    } else {
+      let ownerIdForAlloc = null;
+      try {
+        if (req.user.role === "user") {
+          ownerIdForAlloc = String(req.user.id);
+        } else if (req.user.role === "agent" || req.user.role === "dropshipper") {
+          const creator = await User.findById(req.user.id).select("createdBy").lean();
+          ownerIdForAlloc = String(creator?.createdBy || "");
+        }
+      } catch {}
+
+      const getCountryStock = (product, country) => {
+        if (!product.stockByCountry) return product.stockQty || 0;
+        const c = String(country || "");
+        if (c === "UAE" || c === "United Arab Emirates")
+          return product.stockByCountry.UAE || 0;
+        if (c === "Oman" || c === "OM") return product.stockByCountry.Oman || 0;
+        if (c === "KSA" || c === "Saudi Arabia")
+          return product.stockByCountry.KSA || 0;
+        if (c === "Bahrain" || c === "BH")
+          return product.stockByCountry.Bahrain || 0;
+        if (c === "India" || c === "IN") return product.stockByCountry.India || 0;
+        if (c === "Kuwait" || c === "KW")
+          return product.stockByCountry.Kuwait || 0;
+        if (c === "Qatar" || c === "QA") return product.stockByCountry.Qatar || 0;
+        return 0;
+      };
+
+      if (normItems.length > 0) {
+        // Check stock for multi-item orders
+        for (const it of normItems) {
+          const p = await Product.findById(it.productId);
+          if (!p) continue;
+          const requestedQty = Math.max(1, Number(it.quantity || 1));
+          const availableStock = getCountryStock(p, orderCountry);
+          let reserved = 0;
+          try {
+            const ownerForThis =
+              ownerIdForAlloc || (req.user.role === "admin" ? String(p.createdBy || "") : "");
+            if (ownerForThis && mongoose.Types.ObjectId.isValid(ownerForThis)) {
+              const agg = await ManagerProductStock.aggregate([
+                {
+                  $match: {
+                    ownerId: new mongoose.Types.ObjectId(ownerForThis),
+                    productId: new mongoose.Types.ObjectId(p._id),
+                    country: countryKeyForStock,
+                  },
+                },
+                { $group: { _id: null, total: { $sum: "$qty" } } },
+              ]);
+              reserved = Number(agg?.[0]?.total || 0);
+            }
+          } catch {}
+          const freeStock = Math.max(0, Number(availableStock) - Number(reserved || 0));
+          if (freeStock < requestedQty) {
+            return res.status(400).json({
+              message: `No stock available for ${p.name} in ${orderCountry}. Available: ${freeStock}, Requested: ${requestedQty}`,
+              error: "INSUFFICIENT_STOCK",
+              product: p.name,
+              available: freeStock,
+              requested: requestedQty,
+            });
+          }
+        }
+      } else if (prod) {
+        // Check stock for single product order
+        const requestedQty = Math.max(1, Number(quantity || 1));
+        const availableStock = getCountryStock(prod, orderCountry);
+        let reserved = 0;
+        try {
+          const ownerForThis =
+            ownerIdForAlloc || (req.user.role === "admin" ? String(prod.createdBy || "") : "");
+          if (ownerForThis && mongoose.Types.ObjectId.isValid(ownerForThis)) {
+            const agg = await ManagerProductStock.aggregate([
+              {
+                $match: {
+                  ownerId: new mongoose.Types.ObjectId(ownerForThis),
+                  productId: new mongoose.Types.ObjectId(prod._id),
+                  country: countryKeyForStock,
+                },
+              },
+              { $group: { _id: null, total: { $sum: "$qty" } } },
+            ]);
+            reserved = Number(agg?.[0]?.total || 0);
+          }
+        } catch {}
+        const freeStock = Math.max(0, Number(availableStock) - Number(reserved || 0));
+        if (freeStock < requestedQty) {
+          return res.status(400).json({
+            message: `No stock available for ${prod.name} in ${orderCountry}. Available: ${freeStock}, Requested: ${requestedQty}`,
+            error: "INSUFFICIENT_STOCK",
+            product: prod.name,
+            available: freeStock,
+            requested: requestedQty,
+          });
+        }
       }
     }
     const cod = Math.max(0, Number(codAmount || 0));
@@ -845,14 +957,101 @@ router.post(
     // Decrease stock immediately when order is created (reserve inventory)
     try {
       const country = orderCountry;
-      if (normItems.length > 0) {
-        // Multi-item order
-        for (const it of normItems) {
-          const p = await Product.findById(it.productId);
-          if (!p) continue;
-          const qty = Math.max(1, Number(it.quantity || 1));
-          if (p.stockByCountry) {
-            const byC = p.stockByCountry;
+      const countryKey = normalizeManagerStockCountry(country);
+
+      if (req.user.role === "manager") {
+        const mgrOwner = await User.findById(req.user.id).select("createdBy").lean();
+        const ownerId = String(mgrOwner?.createdBy || "");
+        if (!ownerId) throw new Error("Manager has no owner");
+
+        const consumedItems = [];
+        if (normItems.length > 0) {
+          for (const it of normItems) {
+            const qty = Math.max(1, Number(it.quantity || 1));
+            const updated = await ManagerProductStock.findOneAndUpdate(
+              {
+                ownerId,
+                managerId: req.user.id,
+                productId: it.productId,
+                country: countryKey,
+                qty: { $gte: qty },
+              },
+              { $inc: { qty: -qty }, $set: { updatedBy: req.user.id } },
+              { new: true }
+            );
+            if (!updated) {
+              throw new Error("Insufficient manager stock");
+            }
+            consumedItems.push({ productId: it.productId, quantity: qty });
+          }
+        } else if (prod) {
+          const qty = Math.max(1, Number(quantity || 1));
+          const updated = await ManagerProductStock.findOneAndUpdate(
+            {
+              ownerId,
+              managerId: req.user.id,
+              productId: prod._id,
+              country: countryKey,
+              qty: { $gte: qty },
+            },
+            { $inc: { qty: -qty }, $set: { updatedBy: req.user.id } },
+            { new: true }
+          );
+          if (!updated) {
+            throw new Error("Insufficient manager stock");
+          }
+          consumedItems.push({ productId: prod._id, quantity: qty });
+        }
+
+        doc.managerStockConsumed = {
+          ownerId,
+          managerId: req.user.id,
+          country: countryKey,
+          items: consumedItems,
+        };
+
+        // Decrement product stock as well (physical stock)
+        if (normItems.length > 0) {
+          for (const it of normItems) {
+            const p = await Product.findById(it.productId);
+            if (!p) continue;
+            const qty = Math.max(1, Number(it.quantity || 1));
+            if (p.stockByCountry) {
+              const byC = p.stockByCountry;
+              if (country === "UAE" || country === "United Arab Emirates")
+                byC.UAE = Math.max(0, (byC.UAE || 0) - qty);
+              else if (country === "Oman" || country === "OM")
+                byC.Oman = Math.max(0, (byC.Oman || 0) - qty);
+              else if (country === "KSA" || country === "Saudi Arabia")
+                byC.KSA = Math.max(0, (byC.KSA || 0) - qty);
+              else if (country === "Bahrain" || country === "BH")
+                byC.Bahrain = Math.max(0, (byC.Bahrain || 0) - qty);
+              else if (country === "India" || country === "IN")
+                byC.India = Math.max(0, (byC.India || 0) - qty);
+              else if (country === "Kuwait" || country === "KW")
+                byC.Kuwait = Math.max(0, (byC.Kuwait || 0) - qty);
+              else if (country === "Qatar" || country === "QA")
+                byC.Qatar = Math.max(0, (byC.Qatar || 0) - qty);
+              const totalLeft =
+                (byC.UAE || 0) +
+                (byC.Oman || 0) +
+                (byC.KSA || 0) +
+                (byC.Bahrain || 0) +
+                (byC.India || 0) +
+                (byC.Kuwait || 0) +
+                (byC.Qatar || 0);
+              p.stockQty = totalLeft;
+              p.inStock = totalLeft > 0;
+            } else if (p.stockQty != null) {
+              p.stockQty = Math.max(0, (p.stockQty || 0) - qty);
+              p.inStock = p.stockQty > 0;
+            }
+            await p.save();
+          }
+        } else if (prod) {
+          const qty = Math.max(1, Number(quantity || 1));
+          if (prod.stockByCountry) {
+            const byC = prod.stockByCountry;
             if (country === "UAE" || country === "United Arab Emirates")
               byC.UAE = Math.max(0, (byC.UAE || 0) - qty);
             else if (country === "Oman" || country === "OM")
@@ -875,52 +1074,96 @@ router.post(
               (byC.India || 0) +
               (byC.Kuwait || 0) +
               (byC.Qatar || 0);
-            p.stockQty = totalLeft;
-            p.inStock = totalLeft > 0;
-          } else if (p.stockQty != null) {
-            p.stockQty = Math.max(0, (p.stockQty || 0) - qty);
-            p.inStock = p.stockQty > 0;
+            prod.stockQty = totalLeft;
+            prod.inStock = totalLeft > 0;
+          } else if (prod.stockQty != null) {
+            prod.stockQty = Math.max(0, (prod.stockQty || 0) - qty);
+            prod.inStock = prod.stockQty > 0;
           }
-          await p.save();
+          await prod.save();
         }
-      } else if (prod) {
-        // Single product order
-        const qty = Math.max(1, Number(quantity || 1));
-        if (prod.stockByCountry) {
-          const byC = prod.stockByCountry;
-          if (country === "UAE" || country === "United Arab Emirates")
-            byC.UAE = Math.max(0, (byC.UAE || 0) - qty);
-          else if (country === "Oman" || country === "OM")
-            byC.Oman = Math.max(0, (byC.Oman || 0) - qty);
-          else if (country === "KSA" || country === "Saudi Arabia")
-            byC.KSA = Math.max(0, (byC.KSA || 0) - qty);
-          else if (country === "Bahrain" || country === "BH")
-            byC.Bahrain = Math.max(0, (byC.Bahrain || 0) - qty);
-          else if (country === "India" || country === "IN")
-            byC.India = Math.max(0, (byC.India || 0) - qty);
-          else if (country === "Kuwait" || country === "KW")
-            byC.Kuwait = Math.max(0, (byC.Kuwait || 0) - qty);
-          else if (country === "Qatar" || country === "QA")
-            byC.Qatar = Math.max(0, (byC.Qatar || 0) - qty);
-          const totalLeft =
-            (byC.UAE || 0) +
-            (byC.Oman || 0) +
-            (byC.KSA || 0) +
-            (byC.Bahrain || 0) +
-            (byC.India || 0) +
-            (byC.Kuwait || 0) +
-            (byC.Qatar || 0);
-          prod.stockQty = totalLeft;
-          prod.inStock = totalLeft > 0;
-        } else if (prod.stockQty != null) {
-          prod.stockQty = Math.max(0, (prod.stockQty || 0) - qty);
-          prod.inStock = prod.stockQty > 0;
+
+        doc.inventoryAdjusted = true;
+        doc.inventoryAdjustedAt = new Date();
+        await doc.save();
+      } else {
+        if (normItems.length > 0) {
+          // Multi-item order
+          for (const it of normItems) {
+            const p = await Product.findById(it.productId);
+            if (!p) continue;
+            const qty = Math.max(1, Number(it.quantity || 1));
+            if (p.stockByCountry) {
+              const byC = p.stockByCountry;
+              if (country === "UAE" || country === "United Arab Emirates")
+                byC.UAE = Math.max(0, (byC.UAE || 0) - qty);
+              else if (country === "Oman" || country === "OM")
+                byC.Oman = Math.max(0, (byC.Oman || 0) - qty);
+              else if (country === "KSA" || country === "Saudi Arabia")
+                byC.KSA = Math.max(0, (byC.KSA || 0) - qty);
+              else if (country === "Bahrain" || country === "BH")
+                byC.Bahrain = Math.max(0, (byC.Bahrain || 0) - qty);
+              else if (country === "India" || country === "IN")
+                byC.India = Math.max(0, (byC.India || 0) - qty);
+              else if (country === "Kuwait" || country === "KW")
+                byC.Kuwait = Math.max(0, (byC.Kuwait || 0) - qty);
+              else if (country === "Qatar" || country === "QA")
+                byC.Qatar = Math.max(0, (byC.Qatar || 0) - qty);
+              const totalLeft =
+                (byC.UAE || 0) +
+                (byC.Oman || 0) +
+                (byC.KSA || 0) +
+                (byC.Bahrain || 0) +
+                (byC.India || 0) +
+                (byC.Kuwait || 0) +
+                (byC.Qatar || 0);
+              p.stockQty = totalLeft;
+              p.inStock = totalLeft > 0;
+            } else if (p.stockQty != null) {
+              p.stockQty = Math.max(0, (p.stockQty || 0) - qty);
+              p.inStock = p.stockQty > 0;
+            }
+            await p.save();
+          }
+        } else if (prod) {
+          // Single product order
+          const qty = Math.max(1, Number(quantity || 1));
+          if (prod.stockByCountry) {
+            const byC = prod.stockByCountry;
+            if (country === "UAE" || country === "United Arab Emirates")
+              byC.UAE = Math.max(0, (byC.UAE || 0) - qty);
+            else if (country === "Oman" || country === "OM")
+              byC.Oman = Math.max(0, (byC.Oman || 0) - qty);
+            else if (country === "KSA" || country === "Saudi Arabia")
+              byC.KSA = Math.max(0, (byC.KSA || 0) - qty);
+            else if (country === "Bahrain" || country === "BH")
+              byC.Bahrain = Math.max(0, (byC.Bahrain || 0) - qty);
+            else if (country === "India" || country === "IN")
+              byC.India = Math.max(0, (byC.India || 0) - qty);
+            else if (country === "Kuwait" || country === "KW")
+              byC.Kuwait = Math.max(0, (byC.Kuwait || 0) - qty);
+            else if (country === "Qatar" || country === "QA")
+              byC.Qatar = Math.max(0, (byC.Qatar || 0) - qty);
+            const totalLeft =
+              (byC.UAE || 0) +
+              (byC.Oman || 0) +
+              (byC.KSA || 0) +
+              (byC.Bahrain || 0) +
+              (byC.India || 0) +
+              (byC.Kuwait || 0) +
+              (byC.Qatar || 0);
+            prod.stockQty = totalLeft;
+            prod.inStock = totalLeft > 0;
+          } else if (prod.stockQty != null) {
+            prod.stockQty = Math.max(0, (prod.stockQty || 0) - qty);
+            prod.inStock = prod.stockQty > 0;
+          }
+          await prod.save();
         }
-        await prod.save();
+        doc.inventoryAdjusted = true;
+        doc.inventoryAdjustedAt = new Date();
+        await doc.save();
       }
-      doc.inventoryAdjusted = true;
-      doc.inventoryAdjustedAt = new Date();
-      await doc.save();
     } catch (err) {
       console.error("[Order Create] Failed to adjust inventory:", err);
     }
@@ -4499,6 +4742,30 @@ router.post(
       order.returnVerifiedAt = new Date();
       order.returnVerifiedBy = req.user.id;
 
+      // Restore manager allocation stock if this order consumed it
+      try {
+        if (order.managerStockConsumed && order.managerStockConsumed.managerId) {
+          const ms = order.managerStockConsumed;
+          const ownerId = ms.ownerId;
+          const managerId = ms.managerId;
+          const countryKey = ms.country || normalizeManagerStockCountry(order.orderCountry);
+          const items = Array.isArray(ms.items) ? ms.items : [];
+          for (const it of items) {
+            const pid = it.productId && (it.productId._id || it.productId);
+            const qty = Math.max(1, Number(it.quantity || 1));
+            if (!pid) continue;
+            await ManagerProductStock.findOneAndUpdate(
+              { ownerId, managerId, productId: pid, country: countryKey },
+              { $inc: { qty }, $set: { updatedBy: req.user.id } },
+              { upsert: true, new: true }
+            );
+          }
+          order.managerStockConsumed = null;
+        }
+      } catch (msErr) {
+        console.error("Error restoring manager stock:", msErr);
+      }
+
       // Refill stock only if it was previously decremented on delivery
       try {
         if (order.inventoryAdjusted) {
@@ -4806,8 +5073,36 @@ router.delete("/:id", auth, allowRoles("admin", "user", "manager"), async (req, 
 
     // Auto-restock: restore product stock before deleting
     const orderCountry = order.orderCountry || order.country || "UAE";
-    
-    if (collection === "Order") {
+
+    // If order consumed manager allocation stock, restore that instead of product stock
+    if (collection === "Order" && order.managerStockConsumed && order.managerStockConsumed.managerId) {
+      try {
+        const ms = order.managerStockConsumed;
+        const ownerId = ms.ownerId;
+        const managerId = ms.managerId;
+        const countryKey = ms.country || normalizeManagerStockCountry(orderCountry);
+        const items = Array.isArray(ms.items) ? ms.items : [];
+        for (const it of items) {
+          const pid = it.productId && (it.productId._id || it.productId);
+          const qty = Math.max(1, Number(it.quantity || 1));
+          if (!pid) continue;
+          await ManagerProductStock.findOneAndUpdate(
+            { ownerId, managerId, productId: pid, country: countryKey },
+            { $inc: { qty }, $set: { updatedBy: req.user.id } },
+            { upsert: true, new: true }
+          );
+        }
+      } catch (msErr) {
+        console.error("Delete order: failed to restore manager stock", msErr);
+      }
+    }
+
+    const shouldRestoreProductStock =
+      collection !== "Order" ? true : Boolean(order.inventoryAdjusted);
+
+    if (!shouldRestoreProductStock) {
+      // already restored (e.g., via return verify)
+    } else if (collection === "Order") {
       // Single product order
       if (order.productId) {
         const qty = Math.max(1, Number(order.quantity || 1));

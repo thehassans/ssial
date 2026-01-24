@@ -8,9 +8,18 @@ export default function ProductDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const [me, setMe] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('me') || '{}')
+    } catch {
+      return {}
+    }
+  })
   const [product, setProduct] = useState(null)
   const [warehouseData, setWarehouseData] = useState(null)
   const [orders, setOrders] = useState([])
+  const [managerStockRows, setManagerStockRows] = useState([])
+  const [managerOptions, setManagerOptions] = useState([])
   const [loading, setLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [countryFilter, setCountryFilter] = useState('all')
@@ -39,6 +48,8 @@ export default function ProductDetail() {
   const [addStockForm, setAddStockForm] = useState({ country: 'UAE', quantity: '' })
   const [addingStock, setAddingStock] = useState(false)
 
+  const [allocModal, setAllocModal] = useState({ open: false, busy: false, error: '', managerId: '', country: 'UAE', qty: '' })
+
   // Stock History modal state
   const [showStockHistory, setShowStockHistory] = useState(false)
   const [stockHistory, setStockHistory] = useState([])
@@ -61,7 +72,25 @@ export default function ProductDetail() {
     if (id) {
       loadProductAndOrders()
     }
-  }, [id])
+  }, [id, me?.role])
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const { user } = await apiGet('/api/users/me')
+        if (!alive) return
+        setMe(user || {})
+        try {
+          localStorage.setItem('me', JSON.stringify(user || {}))
+        } catch {}
+      } catch {
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function loadCategories() {
     try {
@@ -363,10 +392,24 @@ export default function ProductDetail() {
     setLoading(true)
     try {
       // Make all API calls in parallel for faster loading
-      const [productResult, warehouseResult, ordersResult] = await Promise.allSettled([
+      const managerStockReq = (() => {
+        const role = String(me?.role || '')
+        if (role === 'manager') return apiGet(`/api/manager-stock/me?productId=${id}`)
+        if (role === 'user' || role === 'admin') return apiGet(`/api/manager-stock?productId=${id}`)
+        return Promise.resolve({ rows: [] })
+      })()
+      const managersReq = (() => {
+        const role = String(me?.role || '')
+        if (role === 'user' || role === 'admin') return apiGet('/api/users/managers?q=')
+        return Promise.resolve({ users: [] })
+      })()
+
+      const [productResult, warehouseResult, ordersResult, managerStockResult, managersResult] = await Promise.allSettled([
         apiGet(`/api/products/${id}`),
         apiGet('/api/warehouse/summary'),
         apiGet(`/api/orders/by-product/${id}`),
+        managerStockReq,
+        managersReq,
       ])
 
       // Handle product data
@@ -413,10 +456,46 @@ export default function ProductDetail() {
         console.error('Failed to load orders:', ordersResult.reason)
         setOrders([])
       }
+
+      if (managerStockResult.status === 'fulfilled') {
+        setManagerStockRows(Array.isArray(managerStockResult.value?.rows) ? managerStockResult.value.rows : [])
+      } else {
+        setManagerStockRows([])
+      }
+      if (managersResult.status === 'fulfilled') {
+        setManagerOptions(Array.isArray(managersResult.value?.users) ? managersResult.value.users : [])
+      } else {
+        setManagerOptions([])
+      }
     } catch (err) {
       console.error('Unexpected error loading data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function saveAllocation() {
+    if (!allocModal.managerId) {
+      setAllocModal((m) => ({ ...m, error: 'Select a manager' }))
+      return
+    }
+    const qty = Number(allocModal.qty || 0)
+    if (isNaN(qty) || qty < 0) {
+      setAllocModal((m) => ({ ...m, error: 'Enter a valid quantity' }))
+      return
+    }
+    setAllocModal((m) => ({ ...m, busy: true, error: '' }))
+    try {
+      await apiPost('/api/manager-stock/set', {
+        productId: id,
+        managerId: allocModal.managerId,
+        country: allocModal.country,
+        qty,
+      })
+      setAllocModal({ open: false, busy: false, error: '', managerId: '', country: 'UAE', qty: '' })
+      await loadProductAndOrders()
+    } catch (e) {
+      setAllocModal((m) => ({ ...m, busy: false, error: e?.message || 'Failed to allocate stock' }))
     }
   }
 
@@ -726,36 +805,56 @@ export default function ProductDetail() {
               <option value="AUD">AUD</option>
             </select>
           </div>
-          <button
-            className="btn secondary"
-            onClick={() => {
-              setShowStockHistory(true)
-              loadStockHistory()
-            }}
-            style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-          >
-            📊 Stock History
-          </button>
-          <button
-            onClick={() => setShowEditHistory(true)}
-            style={{ padding: '10px 20px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-          >
-            📝 Edit History
-          </button>
-          <button
-            className="btn"
-            onClick={() => setShowAddStock(true)}
-            style={{ padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-          >
-            ➕ Add Stock
-          </button>
-          <button
-            className="btn"
-            onClick={openEditModal}
-            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
-          >
-            ✏️ Edit Product
-          </button>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button
+              className="btn secondary"
+              onClick={() => {
+                setShowStockHistory(true)
+                loadStockHistory()
+              }}
+              style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+            >
+              📊 Stock History
+            </button>
+            {(String(me?.role || '') === 'user' || String(me?.role || '') === 'admin') && (
+              <button
+                className="btn secondary"
+                onClick={() => setAllocModal((m) => ({ ...m, open: true, error: '' }))}
+                style={{ padding: '10px 20px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+              >
+                🏷️ Allocate Stock
+              </button>
+            )}
+            {String(me?.role || '') === 'manager' && (
+              <button
+                className="btn secondary"
+                onClick={() => navigate('/manager/my-stock')}
+                style={{ padding: '10px 20px', background: '#22c55e', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+              >
+                📦 My Stock
+              </button>
+            )}
+            <button
+              onClick={() => setShowEditHistory(true)}
+              style={{ padding: '10px 20px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+            >
+              📝 Edit History
+            </button>
+            <button
+              className="btn"
+              onClick={() => setShowAddStock(true)}
+              style={{ padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+            >
+              ➕ Add Stock
+            </button>
+            <button
+              className="btn"
+              onClick={openEditModal}
+              style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer' }}
+            >
+              ✏️ Edit Product
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1085,6 +1184,81 @@ export default function ProductDetail() {
                   )
                 })}
               </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
+                Manager Stock
+              </div>
+              {String(me?.role || '') === 'manager' ? (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {['UAE', 'Oman', 'KSA', 'Bahrain', 'India', 'Kuwait', 'Qatar', 'Australia', 'Canada', 'UK', 'USA', 'Pakistan'].map((country) => {
+                    const row = (managerStockRows || []).find((r) => String(r?.country) === String(country))
+                    const qty = Number(row?.qty || 0)
+                    return (
+                      <div
+                        key={country}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: 8,
+                          background: qty > 0 ? 'var(--panel)' : '#f9fafb',
+                          border: '1px solid var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          opacity: qty > 0 ? 1 : 0.5,
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>{country}:</span>
+                        <span style={{ fontWeight: 800, color: qty === 0 ? '#9ca3af' : qty < 5 ? '#dc2626' : qty < 10 ? '#ea580c' : '#059669' }}>
+                          {qty}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {Array.isArray(managerStockRows) && managerStockRows.length ? (
+                    (() => {
+                      const grouped = {}
+                      for (const r of managerStockRows) {
+                        const m = r?.managerId
+                        const mid = String(m?._id || r?.managerId || '')
+                        if (!mid) continue
+                        const name = `${m?.firstName || ''} ${m?.lastName || ''}`.trim() || m?.email || 'Manager'
+                        if (!grouped[mid]) grouped[mid] = { name, countries: {} }
+                        grouped[mid].countries[String(r?.country || '')] = Number(r?.qty || 0)
+                      }
+                      const keys = Object.keys(grouped)
+                      keys.sort((a, b) => String(grouped[a].name).localeCompare(String(grouped[b].name)))
+                      return keys.map((mid) => {
+                        const g = grouped[mid]
+                        const entries = Object.entries(g.countries || {}).filter(([, v]) => Number(v || 0) > 0)
+                        return (
+                          <div key={mid} style={{ padding: 12, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--panel)' }}>
+                            <div style={{ fontWeight: 800, marginBottom: 8 }}>{g.name}</div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              {entries.length ? (
+                                entries.map(([c, v]) => (
+                                  <span key={c} className="chip" style={{ background: 'var(--panel)', border: '1px solid var(--border)' }}>
+                                    <strong>{c}</strong>
+                                    <span style={{ marginLeft: 6 }}>{Number(v || 0)}</span>
+                                  </span>
+                                ))
+                              ) : (
+                                <div className="helper">No allocated stock</div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    })()
+                  ) : (
+                    <div className="helper">No manager allocations</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2477,6 +2651,55 @@ export default function ProductDetail() {
               rows={3}
               style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}
             />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        title="Allocate Manager Stock"
+        open={allocModal.open}
+        onClose={() => setAllocModal((m) => ({ ...m, open: false, busy: false, error: '' }))}
+        footer={
+          <>
+            <button className="btn secondary" onClick={() => setAllocModal((m) => ({ ...m, open: false, busy: false, error: '' }))} disabled={allocModal.busy}>
+              Cancel
+            </button>
+            <button className="btn" onClick={saveAllocation} disabled={allocModal.busy} style={{ background: '#0ea5e9', color: 'white', border: 'none' }}>
+              {allocModal.busy ? 'Saving...' : 'Save'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          {allocModal.error ? (
+            <div className="helper" style={{ color: '#ef4444' }}>
+              {allocModal.error}
+            </div>
+          ) : null}
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div className="label">Manager</div>
+            <select className="input" value={allocModal.managerId} onChange={(e) => setAllocModal((m) => ({ ...m, managerId: e.target.value, error: '' }))} disabled={allocModal.busy}>
+              <option value="">Select manager</option>
+              {(managerOptions || []).map((m) => (
+                <option key={String(m._id || m.id)} value={String(m._id || m.id)}>
+                  {`${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div className="label">Country</div>
+            <select className="input" value={allocModal.country} onChange={(e) => setAllocModal((m) => ({ ...m, country: e.target.value, error: '' }))} disabled={allocModal.busy}>
+              {['UAE', 'Oman', 'KSA', 'Bahrain', 'India', 'Kuwait', 'Qatar', 'Pakistan', 'Jordan', 'USA', 'UK', 'Canada', 'Australia'].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div className="label">Quantity</div>
+            <input className="input" value={allocModal.qty} onChange={(e) => setAllocModal((m) => ({ ...m, qty: e.target.value, error: '' }))} disabled={allocModal.busy} placeholder="0" />
           </div>
         </div>
       </Modal>
