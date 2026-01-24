@@ -754,19 +754,16 @@ export default function ManagerOrders(){
           <div className="helper" style={{display:'flex', alignItems:'center', gap:6}}>
             <span>👤</span> Created by: <strong>{(o.createdBy?.firstName||'') + ' ' + (o.createdBy?.lastName||'')}</strong>
           </div>
-          <div className="helper" style={{display:'flex', alignItems:'center', gap:6}}>
-            <span>📅</span> {o.createdAt ? new Date(o.createdAt).toLocaleString() : ''}
-          </div>
         </div>
       </div>
     )
   }
 
-  if (!perms.canCreateOrders){
+  if (loading){
     return (
       <div className="section">
-        <div className="page-header"><div><div className="page-title gradient heading-purple">Orders</div><div className="page-subtitle">You do not have access to Orders.</div></div></div>
-        <div className="card"><div>You don't have permission to view this page. Please contact the workspace owner.</div></div>
+        <div className="page-header"><div><div className="page-title gradient heading-purple">Orders</div><div className="page-subtitle">Loading…</div></div></div>
+        <div className="card"><div className="helper">Please wait</div></div>
       </div>
     )
   }

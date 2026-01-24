@@ -337,10 +337,9 @@ export default function ManagerDashboard(){
         </div>
       </div>
 
-      <div className="grid" style={{gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap:tileGap, alignItems:'start'}}>
-
+      <div style={{display:'grid', gap:12}}>
       {/* Orders Summary (Access Countries) */}
-      <div className="card" style={{padding:16, marginBottom:12}}>
+      <div className="card" style={{padding:16}}>
         {(function(){
           // Counts from API totals (summary/state)
           const totalOrdersCount = Object.values(summary||{}).reduce((s,r)=> s + Number(r?.orders||0), 0)
@@ -400,7 +399,7 @@ export default function ManagerDashboard(){
       </div>
 
       {/* Driver Report by Country (Access Countries) */}
-      <div className="card" style={{padding:16, marginBottom:12}}>
+      <div className="card" style={{padding:16}}>
         <div style={{fontWeight:800,fontSize:16, marginBottom:6}}>Driver Report by Country (Your Access)</div>
         <div className="helper" style={{marginBottom:12}}>Counts from orders; amounts in local currency.</div>
         <div className="section" style={{display:'grid', gap:12}}>
@@ -451,7 +450,7 @@ export default function ManagerDashboard(){
       </div>
 
       {/* Status Summary (Access Countries) */}
-      <div className="card" style={{padding:16, marginBottom:12}}>
+      <div className="card" style={{padding:16}}>
         {(function(){
           const st = statusExact
           function Chips({ keyName }){
@@ -499,12 +498,12 @@ export default function ManagerDashboard(){
           )
         })()}
       </div>
-    </div>
+      </div>
 
       {/* Quick actions moved to bottom on mobile */}
 
       {/* Drivers & Orders (Your Access) */}
-      <div className="card" style={{padding:16, marginTop:12}}>
+      <div className="card" style={{padding:16}}>
         {(function(){
           const byCountry = (COUNTRY_LIST||[]).reduce((acc,c)=>{ acc[c] = []; return acc }, {})
           const canon = (v)=>{
@@ -635,7 +634,7 @@ export default function ManagerDashboard(){
       </div>
 
       {/* Country Summary (assigned only) */}
-      <div className="card" style={{padding:16, marginTop:12}}>
+      <div className="card" style={{padding:16}}>
         <div style={{fontWeight:800,fontSize:16, marginBottom:6}}>Country Summary</div>
         <div className="helper" style={{marginBottom:12}}>Orders, Delivered, Cancelled, and Collections for your assigned countries</div>
         <div className="section" style={{overflowX:'auto'}}>

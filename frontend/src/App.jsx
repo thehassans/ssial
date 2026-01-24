@@ -96,8 +96,6 @@ const ManagerOrders = lazy(() => import('./pages/manager/Orders.jsx'))
 const ManagerDriverFinances = lazy(() => import('./pages/manager/DriverFinances.jsx'))
 const ManagerDriverAmounts = lazy(() => import('./pages/manager/DriverAmounts.jsx'))
 const ManagerCreateDriver = lazy(() => import('./pages/manager/CreateDriver.jsx'))
-const AgentRemitHistory = lazy(() => import('./pages/manager/AgentRemitHistory.jsx'))
-const ManagerExpenses = lazy(() => import('./pages/manager/Expenses.jsx'))
 const ManagerReturnedOrders = lazy(() => import('./pages/manager/ReturnedOrders.jsx'))
 const ManagerMe = lazy(() => import('./pages/manager/Me.jsx'))
 
@@ -198,6 +196,37 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('App Error:', error, errorInfo)
+    try {
+      const msg = String(error?.message || '')
+      const isChunkError = /Failed to fetch dynamically imported module|Loading chunk|Importing a module script failed/i.test(msg)
+      if (isChunkError) {
+        const key = 'chunk_reload_done'
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1')
+          try {
+            if ('serviceWorker' in navigator && navigator.serviceWorker?.getRegistrations) {
+              navigator.serviceWorker.getRegistrations().then((regs) => {
+                regs.forEach((r) => {
+                  try {
+                    r.unregister()
+                  } catch {}
+                })
+              }).catch(() => {})
+            }
+          } catch {}
+          try {
+            if (typeof caches !== 'undefined' && caches?.keys) {
+              caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).catch(() => {})
+            }
+          } catch {}
+          setTimeout(() => {
+            try {
+              window.location.reload()
+            } catch {}
+          }, 50)
+        }
+      }
+    } catch {}
   }
 
   render() {
@@ -611,18 +640,18 @@ export default function App() {
             >
               <Route index element={<ManagerDashboard />} />
               <Route path="inbox/whatsapp" element={<WhatsAppInbox />} />
-              <Route path="agents" element={<Agents />} />
+              <Route path="agents" element={<Navigate to="/manager" replace />} />
               <Route path="orders" element={<ManagerOrders />} />
               <Route path="orders/returned" element={<ManagerReturnedOrders />} />
               <Route path="drivers/create" element={<ManagerCreateDriver />} />
-              <Route path="finances/history/agents" element={<AgentRemitHistory />} />
+              <Route path="finances/history/agents" element={<Navigate to="/manager" replace />} />
               <Route path="transactions/drivers" element={<ManagerDriverFinances />} />
               <Route path="driver-amounts" element={<ManagerDriverAmounts />} />
-              <Route path="warehouses" element={<Warehouse />} />
+              <Route path="warehouses" element={<Navigate to="/manager" replace />} />
               <Route path="inhouse-products" element={<InhouseProducts />} />
               <Route path="products" element={<UserProducts />} />
               <Route path="products/:id" element={<RequireManagerPerm perm="canAccessProductDetail"><UserProductDetail /></RequireManagerPerm>} />
-              <Route path="expenses" element={<ManagerExpenses />} />
+              <Route path="expenses" element={<Navigate to="/manager" replace />} />
               <Route path="me" element={<ManagerMe />} />
             </Route>
 
