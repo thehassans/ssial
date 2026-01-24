@@ -1190,7 +1190,7 @@ export default function CartPage() {
                 </div>
                 
                 <button 
-                  onClick={submitOrder}
+                  onClick={() => navigate('/checkout')}
                   disabled={isLoading}
                   style={{
                     width: '100%',
@@ -1205,7 +1205,7 @@ export default function CartPage() {
                     boxShadow: '0 4px 14px rgba(249, 115, 22, 0.3)'
                   }}
                 >
-                  {isLoading ? 'Placing Order...' : 'Place Order'}
+                  {isLoading ? 'Loading...' : 'Checkout'}
                 </button>
               </div>
             </div>

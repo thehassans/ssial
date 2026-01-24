@@ -170,7 +170,7 @@ const Support = lazy(() => import('./pages/support/Support.jsx'))
 const ProductCatalog = lazy(() => import('./pages/ecommerce/ProductCatalog.jsx'))
 const ProductDetail = lazy(() => import('./pages/ecommerce/ProductDetail.jsx'))
 const CartPage = lazy(() => import('./pages/ecommerce/CartPage.jsx'))
-const Checkout = lazy(() => import('./pages/store/Checkout.jsx'))
+const Checkout = lazy(() => import('./pages/ecommerce/Checkout.jsx'))
 const PaymentResult = lazy(() => import('./pages/ecommerce/PaymentResult.jsx'))
 
 // Site pages
