@@ -24,7 +24,7 @@ export default function PaymentResult() {
     // Verify payment with backend
     async function verifyPayment() {
       try {
-        const result = await apiGet(`/api/moyasar/verify/${paymentId}`)
+        const result = await apiGet(`/api/moyasar/verify/${paymentId}?apply=1`)
         setPaymentDetails(result)
 
         if (result.status === 'paid') {

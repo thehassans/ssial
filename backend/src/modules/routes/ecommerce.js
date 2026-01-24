@@ -181,6 +181,11 @@ router.post(
         paymentMethod = "cod",
         paymentStatus = "pending",
         paymentId = null,
+        paymentDetails = null,
+        locationLat = null,
+        locationLng = null,
+        couponCode = null,
+        couponDiscount = 0,
       } = req.body || {};
 
       if (!address.trim())
@@ -237,6 +242,10 @@ router.post(
         });
       }
 
+      const subtotal = Math.max(0, Number(total || 0));
+      const disc = Math.max(0, Number(couponDiscount || 0));
+      const finalTotal = Math.max(0, subtotal - disc);
+
       const doc = new WebOrder({
         customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || "Customer",
         customerPhone: customer.phone || "",
@@ -248,13 +257,20 @@ router.post(
         address: address.trim(),
         details: String(details || "").trim(),
         items: orderItems,
-        total: Math.max(0, Number(total || 0)),
+        subtotal: subtotal,
+        couponCode: couponCode ? String(couponCode) : null,
+        couponDiscount: disc,
+        total: finalTotal,
         currency: String(currency || "SAR"),
         status: "new",
+        locationLat: locationLat ? Number(locationLat) : null,
+        locationLng: locationLng ? Number(locationLng) : null,
         paymentMethod: String(paymentMethod || "cod"),
         paymentStatus: String(paymentStatus || "pending"),
         paymentId: paymentId || null,
+        paymentDetails: paymentDetails || {},
       });
+      doc.markModified('paymentDetails');
       await doc.save();
       
       // Emit real-time notification

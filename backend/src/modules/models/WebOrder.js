@@ -70,6 +70,8 @@ const WebOrderSchema = new mongoose.Schema(
     // Payment information
     paymentMethod: { type: String, default: "cod" },
     paymentStatus: { type: String, default: "pending" },
+    paymentId: { type: String, default: null, index: true },
+    paymentDetails: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

@@ -81,6 +81,12 @@ export default function Checkout() {
   const moyasarFormRef = useRef(null)
   const moyasarInitialized = useRef(false)
 
+  const [moyasarWebOrderId, setMoyasarWebOrderId] = useState('')
+  const [stcPayMobile, setStcPayMobile] = useState('')
+  const [stcPayOtp, setStcPayOtp] = useState('')
+  const [stcPayTxUrl, setStcPayTxUrl] = useState('')
+  const [stcPayWebOrderId, setStcPayWebOrderId] = useState('')
+
   // Coupon state
   const [couponCode, setCouponCode] = useState('')
   const [couponApplied, setCouponApplied] = useState(null)
@@ -101,6 +107,31 @@ export default function Checkout() {
     }
     loadMoyasarConfig()
   }, [])
+
+  const ensureMoyasarWebOrder = useCallback(async () => {
+    if (moyasarWebOrderId) return moyasarWebOrderId
+    const orderData = {
+      address: customerInfo.address,
+      city: customerInfo.city,
+      area: '',
+      orderCountry: customerInfo.country,
+      locationLat: customerInfo.location.lat,
+      locationLng: customerInfo.location.lng,
+      items: cartItems.map((item) => ({
+        productId: item.productId || item.id,
+        quantity: item.quantity,
+      })),
+      paymentMethod: paymentInfo.method,
+      paymentStatus: 'pending',
+      couponCode: couponApplied?.code || couponCode || null,
+      couponDiscount: couponDiscount,
+    }
+    const resp = await apiPost('/api/ecommerce/customer/orders', orderData)
+    const webOrderId = resp?.order?._id
+    if (!webOrderId) throw new Error('Order ID missing')
+    setMoyasarWebOrderId(webOrderId)
+    return webOrderId
+  }, [moyasarWebOrderId, customerInfo, cartItems, paymentInfo.method, couponApplied, couponCode, couponDiscount])
 
   // Initialize Moyasar payment form when Mada or Apple Pay is selected
   useEffect(() => {
@@ -136,7 +167,7 @@ export default function Checkout() {
       if (!moyasarFormRef.current || !window.Moyasar) return
 
       const totalAmount = getTotalPrice()
-      const callbackUrl = `${window.location.origin}/api/moyasar/callback`
+      const callbackUrl = moyasarConfig?.callbackUrl || `${window.location.origin}/api/moyasar/callback`
 
       try {
         window.Moyasar.init({
@@ -146,7 +177,15 @@ export default function Checkout() {
           description: `Order - ${getTotalItems()} items`,
           publishable_api_key: moyasarConfig.publishableKey,
           callback_url: callbackUrl,
+          metadata: {
+            checkout: '1',
+          },
+          on_initiating: async () => {
+            const webOrderId = await ensureMoyasarWebOrder()
+            return { metadata: { checkout: '1', webOrderId } }
+          },
           methods: paymentInfo.method === 'mada' ? ['creditcard'] : ['applepay'],
+          supported_networks: paymentInfo.method === 'mada' ? ['mada'] : undefined,
           credit_card: paymentInfo.method === 'mada' ? {
             save_card: false
           } : undefined,
@@ -182,51 +221,16 @@ export default function Checkout() {
   const handleMoyasarPaymentComplete = async (payment) => {
     setMoyasarLoading(true)
     try {
-      // Verify payment on backend
-      const verifyRes = await apiGet(`/api/moyasar/verify/${payment.id}`)
+      const verifyRes = await apiGet(`/api/moyasar/verify/${payment.id}?apply=1`)
       
       if (verifyRes.status !== 'paid') {
         throw new Error(verifyRes.source?.message || 'Payment not confirmed')
       }
 
-      // Create order with payment info
-      const orderData = {
-        customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
-        customerPhone: customerInfo.phone,
-        customerAddress: customerInfo.address,
-        city: customerInfo.city,
-        orderCountry: customerInfo.country,
-        locationLat: customerInfo.location.lat,
-        locationLng: customerInfo.location.lng,
-        items: cartItems.map(item => ({
-          productId: item.productId || item.id,
-          quantity: item.quantity
-        })),
-        paymentMethod: paymentInfo.method,
-        moyasarPaymentId: payment.id,
-        customerEmail: customerInfo.email,
-        postalCode: customerInfo.postalCode
-      }
-
-      const customerToken = localStorage.getItem('token')
-      const response = await fetch('/api/orders/customer', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${customerToken}`
-        },
-        body: JSON.stringify(orderData)
-      })
-
-      const result = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to place order')
-      }
-
+      const webOrderId = verifyRes?.metadata?.webOrderId
       const cartValue = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
       const itemCount = cartItems.reduce((total, item) => total + item.quantity, 0)
-      trackCheckoutComplete(result.orderId || result._id, cartValue, itemCount, paymentInfo.method)
+      trackCheckoutComplete(webOrderId || payment.id, cartValue, itemCount, paymentInfo.method)
 
       localStorage.removeItem('shopping_cart')
       localStorage.removeItem('checkout_cart')
@@ -387,7 +391,13 @@ export default function Checkout() {
   }
 
   const validatePaymentInfo = () => {
-    if (paymentInfo.method === 'cash_on_delivery' || paymentInfo.method === 'paypal') {
+    if (
+      paymentInfo.method === 'cash_on_delivery' ||
+      paymentInfo.method === 'paypal' ||
+      paymentInfo.method === 'mada' ||
+      paymentInfo.method === 'applepay' ||
+      paymentInfo.method === 'stcpay'
+    ) {
       return true
     }
 
@@ -418,6 +428,14 @@ export default function Checkout() {
       // For PayPal, the payment is handled by PayPal buttons
       if (paymentInfo.method === 'paypal') {
         toast.info('Please complete payment using the PayPal button below')
+        return
+      }
+      if (paymentInfo.method === 'mada' || paymentInfo.method === 'applepay') {
+        toast.info('Please complete payment using the form below')
+        return
+      }
+      if (paymentInfo.method === 'stcpay') {
+        toast.info('Please complete STC Pay below')
         return
       }
       if (validatePaymentInfo()) {
@@ -480,16 +498,111 @@ export default function Checkout() {
     }
   }, [step, paymentInfo.method])
 
+  const handleStartStcPay = async () => {
+    if (!stcPayMobile.trim()) {
+      toast.error('Enter STC Pay mobile number')
+      return
+    }
+    setLoading(true)
+    try {
+      const customerToken = localStorage.getItem('token')
+      if (!customerToken) throw new Error('Please login to continue checkout')
+
+      const orderData = {
+        address: customerInfo.address,
+        city: customerInfo.city,
+        area: '',
+        orderCountry: customerInfo.country,
+        locationLat: customerInfo.location.lat,
+        locationLng: customerInfo.location.lng,
+        items: cartItems.map(item => ({
+          productId: item.productId || item.id,
+          quantity: item.quantity
+        })),
+        paymentMethod: 'stcpay',
+        paymentStatus: 'pending',
+        couponCode: couponApplied?.code || couponCode || null,
+        couponDiscount: couponDiscount,
+      }
+
+      const resp = await fetch('/api/ecommerce/customer/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${customerToken}`
+        },
+        body: JSON.stringify(orderData)
+      })
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.message || 'Failed to create order')
+      const webOrderId = json?.order?._id
+      if (!webOrderId) throw new Error('Order ID missing')
+      setStcPayWebOrderId(webOrderId)
+
+      const initRes = await apiPost('/api/moyasar/stcpay/initiate', { webOrderId, mobile: stcPayMobile.trim() })
+      setStcPayTxUrl(initRes?.transactionUrl || '')
+      toast.success('OTP sent. Enter the OTP to confirm payment.')
+    } catch (e) {
+      toast.error(e?.message || 'Failed to start STC Pay')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirmStcPay = async () => {
+    if (!stcPayWebOrderId) {
+      toast.error('Order is missing. Start STC Pay again.')
+      return
+    }
+    if (!stcPayTxUrl) {
+      toast.error('Transaction URL missing. Start STC Pay again.')
+      return
+    }
+    if (!stcPayOtp.trim()) {
+      toast.error('Enter OTP')
+      return
+    }
+    setLoading(true)
+    try {
+      const proceedRes = await apiPost('/api/moyasar/stcpay/proceed', {
+        webOrderId: stcPayWebOrderId,
+        transactionUrl: stcPayTxUrl,
+        otpValue: stcPayOtp.trim(),
+      })
+      if (proceedRes?.status !== 'paid') {
+        throw new Error(proceedRes?.source?.message || 'Payment not confirmed')
+      }
+
+      await apiGet(`/api/moyasar/verify/${proceedRes.id}?apply=1`)
+
+      const cartValue = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+      const itemCount = cartItems.reduce((total, item) => total + item.quantity, 0)
+      trackCheckoutComplete(stcPayWebOrderId, cartValue, itemCount, 'stcpay')
+
+      localStorage.removeItem('shopping_cart')
+      localStorage.removeItem('checkout_cart')
+      localStorage.removeItem('cart')
+      setCartItems([])
+      window.dispatchEvent(new CustomEvent('cartUpdated'))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'shopping_cart', newValue: null }))
+      setStep(3)
+      toast.success('Payment successful! Order placed.')
+    } catch (e) {
+      toast.error(e?.message || 'STC Pay failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Handle order placement with PayPal
   const handlePlaceOrderWithPayPal = async (paypalTransactionId) => {
     setLoading(true)
     
     try {
       const orderData = {
-        customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
-        customerPhone: customerInfo.phone,
-        customerAddress: customerInfo.address,
+        address: customerInfo.address,
         city: customerInfo.city,
+        area: '',
         orderCountry: customerInfo.country,
         locationLat: customerInfo.location.lat,
         locationLng: customerInfo.location.lng,
@@ -498,14 +611,16 @@ export default function Checkout() {
           quantity: item.quantity
         })),
         paymentMethod: 'paypal',
-        paypalTransactionId: paypalTransactionId,
-        customerEmail: customerInfo.email,
-        postalCode: customerInfo.postalCode
+        paymentStatus: 'paid',
+        paymentId: paypalTransactionId,
+        paymentDetails: { paypalTransactionId },
+        couponCode: couponApplied?.code || couponCode || null,
+        couponDiscount: couponDiscount,
       }
 
       const customerToken = localStorage.getItem('token')
       
-      const response = await fetch('/api/orders/customer', {
+      const response = await fetch('/api/ecommerce/customer/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -550,10 +665,9 @@ export default function Checkout() {
     try {
       // Build order data with location
       const orderData = {
-        customerName: `${customerInfo.firstName} ${customerInfo.lastName}`,
-        customerPhone: customerInfo.phone,
-        customerAddress: customerInfo.address,
+        address: customerInfo.address,
         city: customerInfo.city,
+        area: '',
         orderCountry: customerInfo.country,
         locationLat: customerInfo.location.lat,
         locationLng: customerInfo.location.lng,
@@ -562,15 +676,16 @@ export default function Checkout() {
           quantity: item.quantity
         })),
         paymentMethod: paymentInfo.method,
-        customerEmail: customerInfo.email,
-        postalCode: customerInfo.postalCode
+        paymentStatus: paymentInfo.method === 'cash_on_delivery' ? 'pending' : 'pending',
+        couponCode: couponApplied?.code || couponCode || null,
+        couponDiscount: couponDiscount,
       }
 
       // Get customer token for authenticated order
       const customerToken = localStorage.getItem('token')
       
       // Make API call to create order
-      const response = await fetch('/api/orders/customer', {
+      const response = await fetch('/api/ecommerce/customer/orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1042,6 +1157,7 @@ export default function Checkout() {
                           checked={paymentInfo.method === 'mada'}
                           onChange={(e) => {
                             moyasarInitialized.current = false
+                            setMoyasarWebOrderId('')
                             handlePaymentInfoChange('method', e.target.value)
                           }}
                           className="sr-only"
@@ -1082,6 +1198,7 @@ export default function Checkout() {
                           checked={paymentInfo.method === 'applepay'}
                           onChange={(e) => {
                             moyasarInitialized.current = false
+                            setMoyasarWebOrderId('')
                             handlePaymentInfoChange('method', e.target.value)
                           }}
                           className="sr-only"
@@ -1102,6 +1219,38 @@ export default function Checkout() {
                               <span className="font-medium text-gray-900">Apple Pay</span>
                               <span className="text-xs text-gray-500 block">Fast & Secure</span>
                             </div>
+                          </div>
+                        </div>
+                      </label>
+                    )}
+
+                    {moyasarConfig?.publishableKey && (
+                      <label className={`relative flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                        paymentInfo.method === 'stcpay'
+                          ? 'border-purple-600 bg-purple-50 shadow-md'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="stcpay"
+                          checked={paymentInfo.method === 'stcpay'}
+                          onChange={(e) => {
+                            handlePaymentInfoChange('method', e.target.value)
+                          }}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center">
+                          <div className={`w-5 h-5 rounded-full border-2 mr-3 flex items-center justify-center ${
+                            paymentInfo.method === 'stcpay' ? 'border-purple-600 bg-purple-600' : 'border-gray-300'
+                          }`}>
+                            {paymentInfo.method === 'stcpay' && (
+                              <div className="w-2 h-2 bg-white rounded-full"></div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">STC Pay</div>
+                            <div className="text-xs text-gray-500">Wallet payment (OTP)</div>
                           </div>
                         </div>
                       </label>
@@ -1182,6 +1331,78 @@ export default function Checkout() {
                         <div>
                           <h4 className="text-sm font-semibold text-blue-900 mb-1">Secure Payment</h4>
                           <p className="text-sm text-blue-800">Your payment information is encrypted and secure. We never store your card details.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {paymentInfo.method === 'stcpay' && (
+                  <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-xl p-6">
+                      <div className="flex items-start mb-4">
+                        <div className="flex-shrink-0">
+                          <svg className="w-8 h-8 text-purple-700" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v6h5v2h-7V7h2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-semibold text-purple-900 mb-2">Pay with STC Pay</h3>
+                          <div className="text-sm text-purple-800 space-y-1">
+                            <p>• Enter your STC Pay mobile number</p>
+                            <p>• You will receive an OTP to confirm</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number</label>
+                          <input
+                            type="text"
+                            value={stcPayMobile}
+                            onChange={(e) => setStcPayMobile(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                            placeholder="05XXXXXXXX"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">OTP</label>
+                          <input
+                            type="text"
+                            value={stcPayOtp}
+                            onChange={(e) => setStcPayOtp(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                            placeholder="12345"
+                            disabled={!stcPayTxUrl}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={handleStartStcPay}
+                          disabled={loading}
+                          className="w-full sm:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                        >
+                          Send OTP
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmStcPay}
+                          disabled={loading || !stcPayTxUrl}
+                          className="w-full sm:w-auto px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors disabled:opacity-50"
+                        >
+                          Confirm Payment
+                        </button>
+                      </div>
+
+                      <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Amount to pay:</span>
+                          <span className="text-lg font-bold text-purple-800">{getTotalPrice().toFixed(2)} SAR</span>
                         </div>
                       </div>
                     </div>

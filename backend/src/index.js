@@ -215,6 +215,20 @@ app.use(["/uploads", "/api/uploads"], (req, res, next) => {
 });
 app.use(["/uploads", "/api/uploads"], express.static(UPLOADS_DIR));
 
+app.get("/.well-known/apple-developer-merchantid-domain-association", async (req, res) => {
+  try {
+    const Setting = (await import("./modules/models/Setting.js")).default;
+    const doc = await Setting.findOne({ key: "payments" }).lean();
+    const val = (doc && doc.value) || {};
+    const content = String(val.applePayDomainVerification || "").trim();
+    if (!content) return res.status(404).send("Not Found");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.send(content);
+  } catch (e) {
+    return res.status(500).send("Failed");
+  }
+});
+
 // Serve frontend static build if available (single-server deploy)
 // Set SERVE_STATIC=false in env to disable.
 let CLIENT_DIST = null;
