@@ -41,6 +41,7 @@ async function recalculateDropshipperProfitForOrder(order) {
         maxDropPrice = Number(dropPrice);
         maxIdx = i;
       }
+
     }
 
     for (let i = 0; i < order.items.length; i++) {
@@ -1025,67 +1026,8 @@ router.get(
           createdBy: { $in: [req.user.id, ...agentIds, ...managerIds, ...dropshipperIds] },
         };
       } else if (req.user.role === "manager") {
-        // Manager sees workspace orders for their owner (user), filtered by assigned countries
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = mgr?.createdBy;
-        const assignedCountry = mgr?.assignedCountry;
-        const assignedCountries = Array.isArray(mgr?.assignedCountries)
-          ? mgr.assignedCountries
-          : [];
-
-        if (ownerId) {
-          const agents = await User.find(
-            { role: "agent", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const managers = await User.find(
-            { role: "manager", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const dropshippers = await User.find(
-            { role: "dropshipper", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const agentIds = agents.map((a) => a._id);
-          const managerIds = managers.map((m) => m._id);
-          const dropshipperIds = dropshippers.map((d) => d._id);
-          base = { createdBy: { $in: [ownerId, ...agentIds, ...managerIds, ...dropshipperIds] } };
-          // Filter by assigned countries if provided (support aliases)
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry) {
-            base.orderCountry = { $in: expand(assignedCountry) };
-          }
-        } else {
-          base = { createdBy: req.user.id };
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry) {
-            base.orderCountry = { $in: expand(assignedCountry) };
-          }
-        }
+        // Manager sees only orders assigned to them
+        base = { assignedManager: req.user.id };
       } else {
         // agent or dropshipper
         base = { createdBy: req.user.id };
@@ -1283,6 +1225,7 @@ router.get(
         .populate("productId")
         .populate("items.productId")
         .populate("deliveryBoy", "firstName lastName email")
+        .populate("assignedManager", "firstName lastName email")
         .populate("createdBy", "firstName lastName email role")
         .lean();
       const hasMore = skip + orders.length < total;
@@ -1291,6 +1234,94 @@ router.get(
       res
         .status(500)
         .json({ message: "Failed to list orders", error: err?.message });
+    }
+  }
+);
+
+router.post(
+  "/:id/assign-manager",
+  auth,
+  allowRoles("admin", "user"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const managerIdRaw = req.body?.managerId;
+      const ord = await Order.findById(id);
+      if (!ord) return res.status(404).json({ message: "Order not found" });
+
+      if (req.user.role !== "admin") {
+        const agents = await User.find(
+          { role: "agent", createdBy: req.user.id },
+          { _id: 1 }
+        ).lean();
+        const managers = await User.find(
+          { role: "manager", createdBy: req.user.id },
+          { _id: 1 }
+        ).lean();
+        const dropshippers = await User.find(
+          { role: "dropshipper", createdBy: req.user.id },
+          { _id: 1 }
+        ).lean();
+        const allowedCreators = new Set([
+          String(req.user.id),
+          ...agents.map((a) => String(a._id)),
+          ...managers.map((m) => String(m._id)),
+          ...dropshippers.map((d) => String(d._id)),
+        ]);
+        if (!allowedCreators.has(String(ord.createdBy || ""))) {
+          return res.status(403).json({ message: "Not allowed" });
+        }
+      }
+
+      const prev = ord.assignedManager ? String(ord.assignedManager) : "";
+
+      let nextId = null;
+      if (managerIdRaw != null && String(managerIdRaw).trim() !== "") {
+        const managerId = String(managerIdRaw).trim();
+        if (!mongoose.Types.ObjectId.isValid(managerId)) {
+          return res.status(400).json({ message: "Invalid managerId" });
+        }
+        const mgr = await User.findOne({ _id: managerId, role: "manager" })
+          .select("_id createdBy")
+          .lean();
+        if (!mgr) return res.status(404).json({ message: "Manager not found" });
+        if (
+          req.user.role !== "admin" &&
+          String(mgr.createdBy || "") !== String(req.user.id)
+        ) {
+          return res.status(403).json({ message: "Not allowed" });
+        }
+        nextId = mgr._id;
+      }
+
+      ord.assignedManager = nextId;
+      ord.assignedManagerAt = nextId ? new Date() : null;
+      ord.assignedManagerBy = req.user.id;
+      await ord.save();
+
+      try {
+        const io = getIO();
+        if (prev && prev !== String(nextId || "")) {
+          io.to(`user:${prev}`).emit("orders.changed", {
+            orderId: String(ord._id),
+            action: "manager_unassigned",
+          });
+        }
+        if (nextId) {
+          io.to(`user:${String(nextId)}`).emit("orders.changed", {
+            orderId: String(ord._id),
+            action: "manager_assigned",
+          });
+        }
+      } catch {}
+
+      emitOrderChange(ord, "manager_assigned").catch(() => {});
+      await ord.populate("assignedManager", "firstName lastName email");
+      return res.json({ message: "Manager assignment updated", order: ord });
+    } catch (err) {
+      return res
+        .status(500)
+        .json({ message: "Failed to assign manager", error: err?.message });
     }
   }
 );
@@ -1328,49 +1359,7 @@ router.get(
         ];
         base.createdBy = { $in: ids };
       } else if (req.user.role === "manager") {
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = mgr?.createdBy;
-        if (ownerId) {
-          const agents = await User.find(
-            { role: "agent", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const managers = await User.find(
-            { role: "manager", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const ids = [
-            ownerId,
-            ...agents.map((a) => a._id),
-            ...managers.map((m) => m._id),
-          ];
-          base.createdBy = { $in: ids };
-          // Filter by assigned countries
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          const arr =
-            Array.isArray(mgr?.assignedCountries) &&
-            mgr.assignedCountries.length
-              ? mgr.assignedCountries
-              : mgr?.assignedCountry
-              ? [mgr.assignedCountry]
-              : [];
-          if (arr.length) {
-            const set = new Set();
-            for (const c of arr) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          }
-        } else {
-          base.createdBy = req.user.id;
-        }
+        base.assignedManager = req.user.id;
       } else {
         base.createdBy = req.user.id;
       }
@@ -1441,63 +1430,13 @@ router.get(
           createdBy: { $in: [req.user.id, ...agentIds, ...managerIds, ...dropshipperIds] },
         };
       } else if (req.user.role === "manager") {
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = mgr?.createdBy;
-        workspaceOwnerId = ownerId || req.user.id;
-        const assignedCountry = mgr?.assignedCountry;
-        const assignedCountries = Array.isArray(mgr?.assignedCountries)
-          ? mgr.assignedCountries
-          : [];
-        if (ownerId) {
-          const agents = await User.find(
-            { role: "agent", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const managers = await User.find(
-            { role: "manager", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const dropshippers = await User.find(
-            { role: "dropshipper", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const agentIds = agents.map((a) => a._id);
-          const managerIds = managers.map((m) => m._id);
-          const dropshipperIds = dropshippers.map((d) => d._id);
-          base = { createdBy: { $in: [ownerId, ...agentIds, ...managerIds, ...dropshipperIds] } };
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
-        } else {
-          base = { createdBy: req.user.id };
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
+        try {
+          const mgr = await User.findById(req.user.id).select("createdBy").lean();
+          workspaceOwnerId = mgr?.createdBy || req.user.id;
+        } catch {
+          workspaceOwnerId = req.user.id;
         }
+        base = { assignedManager: req.user.id };
       } else {
         // agent or dropshipper
         base = { createdBy: req.user.id };
@@ -1528,8 +1467,7 @@ router.get(
       const excludeDropship = String(req.query.excludeDropship || "").toLowerCase() === "true";
       const includeWeb = String(req.query.includeWeb || "").toLowerCase() === "true";
 
-      const allowWebForRole =
-        req.user.role === "admin" || req.user.role === "user" || req.user.role === "manager";
+      const allowWebForRole = req.user.role === "admin" || req.user.role === "user";
       const includeWebEffective = allowWebForRole && includeWeb && !excludeDropship;
       const doMain = !dropshipOnly;
       const doWeb = allowWebForRole && (includeWebEffective || dropshipOnly) && !excludeDropship;
@@ -2318,63 +2256,13 @@ router.get(
           createdBy: { $in: [req.user.id, ...agentIds, ...managerIds, ...dropshipperIds] },
         };
       } else if (req.user.role === "manager") {
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = mgr?.createdBy;
-        workspaceOwnerId = ownerId || req.user.id;
-        const assignedCountry = mgr?.assignedCountry;
-        const assignedCountries = Array.isArray(mgr?.assignedCountries)
-          ? mgr.assignedCountries
-          : [];
-        if (ownerId) {
-          const agents = await User.find(
-            { role: "agent", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const managers = await User.find(
-            { role: "manager", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const dropshippers = await User.find(
-            { role: "dropshipper", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const agentIds = agents.map((a) => a._id);
-          const managerIds = managers.map((m) => m._id);
-          const dropshipperIds = dropshippers.map((d) => d._id);
-          base = { createdBy: { $in: [ownerId, ...agentIds, ...managerIds, ...dropshipperIds] } };
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
-        } else {
-          base = { createdBy: req.user.id };
-          const expand = (c) =>
-            c === "KSA" || c === "Saudi Arabia"
-              ? ["KSA", "Saudi Arabia"]
-              : c === "UAE" || c === "United Arab Emirates"
-              ? ["UAE", "United Arab Emirates"]
-              : [c];
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
+        try {
+          const mgr = await User.findById(req.user.id).select("createdBy").lean();
+          workspaceOwnerId = mgr?.createdBy || req.user.id;
+        } catch {
+          workspaceOwnerId = req.user.id;
         }
+        base = { assignedManager: req.user.id };
       } else {
         base = { createdBy: req.user.id };
         try {
@@ -2768,56 +2656,7 @@ router.get(
           createdBy: { $in: [req.user.id, ...agentIds, ...managerIds] },
         };
       } else if (req.user.role === "manager") {
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = mgr?.createdBy;
-        const assignedCountry = mgr?.assignedCountry;
-        const assignedCountries = Array.isArray(mgr?.assignedCountries)
-          ? mgr.assignedCountries
-          : [];
-        const expand = (c) =>
-          c === "KSA" || c === "Saudi Arabia"
-            ? ["KSA", "Saudi Arabia"]
-            : c === "UAE" || c === "United Arab Emirates"
-            ? ["UAE", "United Arab Emirates"]
-            : [c];
-        if (ownerId) {
-          const agents = await User.find(
-            { role: "agent", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const managers = await User.find(
-            { role: "manager", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const dropshippers = await User.find(
-            { role: "dropshipper", createdBy: ownerId },
-            { _id: 1 }
-          ).lean();
-          const agentIds = agents.map((a) => a._id);
-          const managerIds = managers.map((m) => m._id);
-          const dropshipperIds = dropshippers.map((d) => d._id);
-          base = { createdBy: { $in: [ownerId, ...agentIds, ...managerIds, ...dropshipperIds] } };
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
-        } else {
-          base = { createdBy: req.user.id };
-          if (Array.isArray(assignedCountries) && assignedCountries.length) {
-            const set = new Set();
-            for (const c of assignedCountries) {
-              for (const x of expand(c)) set.add(x);
-            }
-            base.orderCountry = { $in: Array.from(set) };
-          } else if (assignedCountry)
-            base.orderCountry = { $in: expand(assignedCountry) };
-        }
+        base = { assignedManager: req.user.id };
       } else {
         base = { createdBy: req.user.id };
       }
@@ -2871,6 +2710,7 @@ router.get(
       .populate("productId")
       .populate("items.productId")
       .populate("deliveryBoy", "firstName lastName email")
+      .populate("assignedManager", "firstName lastName email")
       .populate("createdBy", "firstName lastName email role");
     
     // If not found in Order, try WebOrder collection
@@ -2879,6 +2719,9 @@ router.get(
         .populate("items.productId")
         .populate("deliveryBoy", "firstName lastName email");
       if (webOrd) {
+        if (req.user.role === "manager") {
+          return res.status(403).json({ message: "Not allowed" });
+        }
         // Return WebOrder with compatible field names
         return res.json({ order: webOrd });
       }
@@ -2914,47 +2757,8 @@ router.get(
       if (!allowed.has(creatorId))
         return res.status(403).json({ message: "Not allowed" });
     } else if (req.user.role === "manager") {
-      const mgr = await User.findById(req.user.id)
-        .select("createdBy assignedCountry assignedCountries")
-        .lean();
-      const ownerId = String(mgr?.createdBy || "");
-      if (!ownerId) return res.status(403).json({ message: "Not allowed" });
-      const agents = await User.find(
-        { role: "agent", createdBy: ownerId },
-        { _id: 1 }
-      ).lean();
-      const managers = await User.find(
-        { role: "manager", createdBy: ownerId },
-        { _id: 1 }
-      ).lean();
-      const allowed = new Set([
-        ownerId,
-        ...agents.map((a) => String(a._id)),
-        ...managers.map((m) => String(m._id)),
-      ]);
-      if (!allowed.has(creatorId))
+      if (String(ord.assignedManager || "") !== String(req.user.id))
         return res.status(403).json({ message: "Not allowed" });
-      // Country restriction for managers
-      const expand = (c) =>
-        c === "KSA" || c === "Saudi Arabia"
-          ? ["KSA", "Saudi Arabia"]
-          : c === "UAE" || c === "United Arab Emirates"
-          ? ["UAE", "United Arab Emirates"]
-          : [c];
-      const arr =
-        Array.isArray(mgr?.assignedCountries) && mgr.assignedCountries.length
-          ? mgr.assignedCountries
-          : mgr?.assignedCountry
-          ? [mgr.assignedCountry]
-          : [];
-      if (arr.length) {
-        const set = new Set();
-        for (const c of arr) {
-          for (const x of expand(c)) set.add(x);
-        }
-        if (!set.has(String(ord.orderCountry || "")))
-          return res.status(403).json({ message: "Not allowed" });
-      }
     } else if (req.user.role === "agent") {
       if (creatorId !== String(req.user.id))
         return res.status(403).json({ message: "Not allowed" });
@@ -3028,45 +2832,7 @@ router.get(
       const dropshipperIds = dropshippers.map((d) => d._id);
       base.createdBy = { $in: [req.user.id, ...agentIds, ...managerIds, ...dropshipperIds] };
     } else {
-      // manager workspace scoping + country restriction
-      const mgr = await User.findById(req.user.id)
-        .select("createdBy assignedCountry assignedCountries")
-        .lean();
-      const ownerId = mgr?.createdBy;
-      const expand = (c) =>
-        c === "KSA" || c === "Saudi Arabia"
-          ? ["KSA", "Saudi Arabia"]
-          : c === "UAE" || c === "United Arab Emirates"
-          ? ["UAE", "United Arab Emirates"]
-          : [c];
-      if (ownerId) {
-        const agents = await User.find(
-          { role: "agent", createdBy: ownerId },
-          { _id: 1 }
-        ).lean();
-        const managers = await User.find(
-          { role: "manager", createdBy: ownerId },
-          { _id: 1 }
-        ).lean();
-        const agentIds = agents.map((a) => a._id);
-        const managerIds = managers.map((m) => m._id);
-        base.createdBy = { $in: [ownerId, ...agentIds, ...managerIds] };
-      } else {
-        base.createdBy = req.user.id;
-      }
-      const arr =
-        Array.isArray(mgr?.assignedCountries) && mgr.assignedCountries.length
-          ? mgr.assignedCountries
-          : mgr?.assignedCountry
-          ? [mgr.assignedCountry]
-          : [];
-      if (arr.length) {
-        const set = new Set();
-        for (const c of arr) {
-          for (const x of expand(c)) set.add(x);
-        }
-        base.orderCountry = { $in: Array.from(set) };
-      }
+      base.assignedManager = req.user.id;
     }
     if (country) base.orderCountry = country;
     if (city) base.city = city;
@@ -3115,6 +2881,14 @@ router.post(
       ]);
       if (!allowedCreators.has(creatorId)) {
         return res.status(403).json({ message: "Not allowed - order not in your workspace" });
+      }
+    }
+
+    if (req.user.role === "manager") {
+      if (String(ord.assignedManager || "") !== String(req.user.id)) {
+        return res
+          .status(403)
+          .json({ message: "Not allowed - order not assigned to you" });
       }
     }
     
@@ -3803,52 +3577,10 @@ router.patch(
       }
       // Access control: manager can only update within workspace and assigned countries
       else if (req.user.role === "manager") {
-        const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = String(mgr?.createdBy || "");
-        if (!ownerId) return res.status(403).json({ message: "Not allowed" });
-        const agents = await User.find(
-          { role: "agent", createdBy: ownerId },
-          { _id: 1 }
-        ).lean();
-        const managers = await User.find(
-          { role: "manager", createdBy: ownerId },
-          { _id: 1 }
-        ).lean();
-        const allowedCreators = new Set([
-          ownerId,
-          ...agents.map((a) => String(a._id)),
-          ...managers.map((m) => String(m._id)),
-        ]);
-        if (!allowedCreators.has(String(ord.createdBy || ""))) {
-          return res.status(403).json({ message: "Not allowed" });
-        }
-        const expand = (c) =>
-          c === "KSA" || c === "Saudi Arabia"
-            ? ["KSA", "Saudi Arabia"]
-            : c === "UAE" || c === "United Arab Emirates"
-            ? ["UAE", "United Arab Emirates"]
-            : [c];
-        const arr =
-          Array.isArray(mgr?.assignedCountries) && mgr.assignedCountries.length
-            ? mgr.assignedCountries
-            : mgr?.assignedCountry
-            ? [mgr.assignedCountry]
-            : [];
-        if (arr.length) {
-          const set = new Set();
-          for (const c of arr) {
-            for (const x of expand(c)) set.add(x);
-          }
-          if (!set.has(String(ord.orderCountry || ""))) {
-            return res
-              .status(403)
-              .json({
-                message:
-                  "Manager not allowed to edit orders outside assigned countries",
-              });
-          }
+        if (String(ord.assignedManager || "") !== String(req.user.id)) {
+          return res
+            .status(403)
+            .json({ message: "Not allowed - order not assigned to you" });
         }
       }
 
@@ -3882,28 +3614,50 @@ router.patch(
         deliveryBoy !== undefined ? deliveryBoy || null : undefined;
 
       // Prevent managers from changing driver or commission once assigned
-      if (req.user.role === "manager" && previousDriver) {
-        if (
-          deliveryBoy !== undefined &&
-          String(deliveryBoy || "") !== previousDriver
-        ) {
-          return res
-            .status(403)
-            .json({
-              message:
-                "Driver already assigned. Cannot be changed by manager. Contact owner.",
-            });
-        }
-        if (
-          driverCommission !== undefined &&
-          Number(driverCommission) !== Number(ord.driverCommission || 0)
-        ) {
-          return res
-            .status(403)
-            .json({
-              message:
-                "Driver commission locked with assignment. Cannot be changed by manager. Contact owner.",
-            });
+      if (req.user.role === "manager" && deliveryBoy !== undefined) {
+        try {
+          const mgr = await User.findById(req.user.id).select("createdBy").lean();
+          const ownerId = String(mgr?.createdBy || "");
+          if (!ownerId) {
+            return res.status(403).json({ message: "Not allowed" });
+          }
+
+          if (deliveryBoy) {
+            const driver = await User.findById(deliveryBoy)
+              .select("role createdBy country driverProfile")
+              .lean();
+            if (!driver || driver.role !== "driver") {
+              return res.status(400).json({ message: "Driver not found" });
+            }
+            if (String(driver.createdBy || "") !== ownerId) {
+              return res
+                .status(403)
+                .json({ message: "Not allowed - driver not in your workspace" });
+            }
+
+            const expand = (c) =>
+              c === "KSA" || c === "Saudi Arabia"
+                ? ["KSA", "Saudi Arabia"]
+                : c === "UAE" || c === "United Arab Emirates"
+                ? ["UAE", "United Arab Emirates"]
+                : [c];
+            const ds = new Set(expand(String(driver.country || "")));
+            const os = new Set(expand(String(ord.orderCountry || "")));
+            let ok = false;
+            for (const v of ds) {
+              if (os.has(v)) {
+                ok = true;
+                break;
+              }
+            }
+            if (!ok) {
+              return res
+                .status(400)
+                .json({ message: "Driver and order country must match" });
+            }
+          }
+        } catch {
+          return res.status(403).json({ message: "Not allowed" });
         }
       }
 
@@ -4723,60 +4477,8 @@ router.post(
           return res.status(403).json({ message: "Not allowed" });
         }
       } else if (req.user.role === "manager") {
-        // Manager can verify orders they created or in their assigned countries
-        const me = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
-          .lean();
-        const ownerId = String(me?.createdBy);
-
-        const agents = await User.find({ role: "agent", createdBy: ownerId })
-          .select("_id")
-          .lean();
-        const managers = await User.find({
-          role: "manager",
-          createdBy: ownerId,
-        })
-          .select("_id")
-          .lean();
-        const allowedCreators = new Set([
-          ownerId,
-          ...agents.map((a) => String(a._id)),
-          ...managers.map((m) => String(m._id)),
-        ]);
-
-        if (
-          !allowedCreators.has(String(order.createdBy._id || order.createdBy))
-        ) {
+        if (String(order.assignedManager || "") !== String(req.user.id)) {
           return res.status(403).json({ message: "Not allowed" });
-        }
-
-        // Check country assignment
-        const expand = (c) =>
-          c === "KSA" || c === "Saudi Arabia"
-            ? ["KSA", "Saudi Arabia"]
-            : c === "UAE" || c === "United Arab Emirates"
-            ? ["UAE", "United Arab Emirates"]
-            : [c];
-        const arr =
-          Array.isArray(me?.assignedCountries) && me.assignedCountries.length
-            ? me.assignedCountries
-            : me?.assignedCountry
-            ? [me.assignedCountry]
-            : [];
-
-        if (arr.length) {
-          const set = new Set();
-          for (const c of arr) {
-            for (const x of expand(c)) set.add(x);
-          }
-          if (!set.has(String(order.orderCountry || ""))) {
-            return res
-              .status(403)
-              .json({
-                message:
-                  "Manager not allowed to verify orders outside assigned countries",
-              });
-          }
         }
       }
 
@@ -5090,6 +4792,16 @@ router.delete("/:id", auth, allowRoles("admin", "user", "manager"), async (req, 
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Manager can only delete orders assigned to them (and only internal Order collection)
+    if (req.user.role === "manager") {
+      if (collection !== "Order") {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+      if (String(order.assignedManager || "") !== String(req.user.id)) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
     }
 
     // Auto-restock: restore product stock before deleting

@@ -2022,12 +2022,24 @@ a {
     bottom: 0;
     z-index: 1600;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-    background: var(--panel-2);
-    border-top: 1px solid var(--border);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(78px, 1fr);
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: rgba(15, 23, 42, 0.72);
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     padding: 8px 10px;
     padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme='light'] .mobile-tabs {
+    background: rgba(255, 255, 255, 0.78);
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 -18px 40px rgba(2, 6, 23, 0.12);
   }
   .mobile-tabs .tab {
     display: flex;
@@ -2035,18 +2047,29 @@ a {
     justify-content: center;
     align-items: center;
     gap: 4px;
-    color: var(--muted);
+    color: rgba(226, 232, 240, 0.72);
     text-decoration: none;
     padding: 6px 6px;
     border-radius: 10px;
-    border: 1px solid transparent;
+    border: 1px solid rgba(148, 163, 184, 0.14);
     white-space: nowrap;
     min-width: 0;
+    transition: transform 160ms var(--ease-out-expo), background 220ms var(--ease-out-expo), border-color 220ms var(--ease-out-expo), box-shadow 220ms var(--ease-out-expo);
+  }
+  :root[data-theme='light'] .mobile-tabs .tab {
+    color: rgba(15, 23, 42, 0.66);
+    border-color: rgba(15, 23, 42, 0.08);
   }
   .mobile-tabs .tab.active {
-    color: var(--fg);
-    background: rgba(37, 99, 235, 0.12);
-    border-color: rgba(37, 99, 235, 0.35);
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(168, 85, 247, 0.18));
+    border-color: rgba(139, 92, 246, 0.55);
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.22), 0 10px 26px rgba(99, 102, 241, 0.35), 0 0 28px rgba(168, 85, 247, 0.22);
+    transform: translateY(-1px);
+  }
+  :root[data-theme='light'] .mobile-tabs .tab.active {
+    color: #0b1220;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.14));
   }
   .mobile-tabs .tab .icon {
     width: 22px;
@@ -2055,6 +2078,9 @@ a {
     align-items: center;
     justify-content: center;
     position: relative;
+  }
+  .mobile-tabs .tab.active .icon {
+    filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.55));
   }
   .mobile-tabs .tab .icon svg {
     width: 20px;

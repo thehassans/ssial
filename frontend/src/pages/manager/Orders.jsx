@@ -39,6 +39,8 @@ export default function ManagerOrders(){
   const [agentFilter, setAgentFilter] = useState('')
   const [driverFilter, setDriverFilter] = useState('')
   const [agentOptions, setAgentOptions] = useState([])
+  const [countryOptions, setCountryOptions] = useState([])
+  const [cityOptions, setCityOptions] = useState([])
   const [curCfg, setCurCfg] = useState(null)
   const [pendingReturns, setPendingReturns] = useState([])
   const [verifying, setVerifying] = useState(null)
@@ -109,7 +111,7 @@ export default function ManagerOrders(){
     if (agentFilter.trim()) params.set('agent', agentFilter.trim())
     if (driverFilter.trim()) params.set('driver', driverFilter.trim())
     return params
-  }, [q, country, city, ship, onlyUnassigned, agentFilter, driverFilter, selectedMonth, selectedYear])
+  }, [q, country, city, ship, onlyUnassigned, onlyAssigned, agentFilter, driverFilter, selectedMonth, selectedYear])
 
   function countryToCurrency(c){
     const raw = String(c||'').trim().toLowerCase()
@@ -234,6 +236,21 @@ export default function ManagerOrders(){
       try{ const a = await apiGet('/api/users/agents'); setAgentOptions(Array.isArray(a?.users)? a.users: []) }catch{ setAgentOptions([]) }
     })()
   },[])
+
+  async function loadOptions(selectedCountry=''){
+    try{
+      const qs = selectedCountry ? `?country=${encodeURIComponent(selectedCountry)}` : ''
+      const r = await apiGet(`/api/orders/options${qs}`)
+      setCountryOptions(Array.isArray(r?.countries) ? r.countries : [])
+      setCityOptions(Array.isArray(r?.cities) ? r.cities : [])
+    }catch{
+      setCountryOptions([])
+      setCityOptions([])
+    }
+  }
+  useEffect(()=>{ loadOptions('') },[])
+  useEffect(()=>{ loadOptions(country || '') },[country])
+
   // Load driver list for selected filter country
   useEffect(()=>{ if (country) fetchDriversByCountry(country) }, [country])
   // Apply URL params to filters
@@ -260,9 +277,8 @@ export default function ManagerOrders(){
   }, [location.search])
   useEffect(()=>{
     // Default country: if exactly one assigned, set it; if multiple, show all
-    const arr = Array.isArray(me?.assignedCountries) && me.assignedCountries.length ? me.assignedCountries : (me?.assignedCountry ? [me.assignedCountry] : [])
-    if (arr.length === 1) setCountry(arr[0])
-  }, [me])
+    if (Array.isArray(countryOptions) && countryOptions.length === 1) setCountry(countryOptions[0])
+  }, [countryOptions])
 
   // live updates and driver commission changes
   useEffect(()=>{
@@ -349,16 +365,18 @@ export default function ManagerOrders(){
   }, [endRef.current, hasMore, page, buildQuery])
 
   const cities = useMemo(()=>{
+    if (Array.isArray(cityOptions) && cityOptions.length) return cityOptions
     const set = new Set()
     for (const o of orders){ if (o?.city) set.add(o.city) }
     return Array.from(set)
-  }, [orders])
+  }, [orders, cityOptions])
 
   const countries = useMemo(()=>{
-    const assigned = Array.isArray(me?.assignedCountries) && me.assignedCountries.length ? me.assignedCountries : (me?.assignedCountry ? [me.assignedCountry] : [])
-    if (assigned.length) return Array.from(new Set(assigned))
-    return ['UAE','Oman','KSA','Bahrain','India','Kuwait','Qatar']
-  }, [me])
+    if (Array.isArray(countryOptions) && countryOptions.length) return countryOptions
+    const set = new Set()
+    for (const o of orders){ if (o?.orderCountry) set.add(o.orderCountry) }
+    return Array.from(set)
+  }, [orders, countryOptions])
 
   async function exportCsv(){
     if (exportingRef.current) return

@@ -2317,49 +2317,7 @@ router.get(
   allowRoles("manager"),
   async (req, res) => {
     try {
-      const mgr = await User.findById(req.user.id)
-        .select("createdBy assignedCountry assignedCountries")
-        .lean();
-      const ownerId = mgr?.createdBy
-        ? new mongoose.Types.ObjectId(mgr.createdBy)
-        : new mongoose.Types.ObjectId(req.user.id);
-      const agents = await User.find(
-        { role: "agent", createdBy: ownerId },
-        { _id: 1 }
-      ).lean();
-      const managers = await User.find(
-        { role: "manager", createdBy: ownerId },
-        { _id: 1 }
-      ).lean();
-      const creatorIds = [
-        ownerId,
-        ...agents.map((a) => a._id),
-        ...managers.map((m) => m._id),
-      ];
-
-      const expand = (c) =>
-        c === "KSA" || c === "Saudi Arabia"
-          ? ["KSA", "Saudi Arabia"]
-          : c === "UAE" || c === "United Arab Emirates"
-          ? ["UAE", "United Arab Emirates"]
-          : [c];
-      const assignedCountries =
-        Array.isArray(mgr?.assignedCountries) && mgr.assignedCountries.length
-          ? mgr.assignedCountries
-          : mgr?.assignedCountry
-          ? [mgr.assignedCountry]
-          : [];
-      let allowedCountries = null;
-      if (assignedCountries.length) {
-        const set = new Set();
-        for (const c of assignedCountries) {
-          for (const x of expand(c)) set.add(x);
-        }
-        allowedCountries = Array.from(set);
-      }
-
-      const baseMatch = { createdBy: { $in: creatorIds } };
-      if (allowedCountries) baseMatch.orderCountry = { $in: allowedCountries };
+      const baseMatch = { assignedManager: new mongoose.Types.ObjectId(req.user.id) };
 
       const orderStats = await Order.aggregate([
         { $match: baseMatch },

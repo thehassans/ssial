@@ -146,6 +146,7 @@ export default function UserOrders() {
   const [cityOptions, setCityOptions] = useState([])
   const [agentOptions, setAgentOptions] = useState([])
   const [driverOptions, setDriverOptions] = useState([])
+  const [managerOptions, setManagerOptions] = useState([])
   const countryDriverOptions = useMemo(() => {
     const c = String(country || '').trim()
     if (!c) return []
@@ -247,6 +248,12 @@ export default function UserOrders() {
         setAgentOptions([])
       }
       try {
+        const m = await apiGet('/api/users/managers?q=')
+        setManagerOptions(Array.isArray(m?.users) ? m.users : [])
+      } catch {
+        setManagerOptions([])
+      }
+      try {
         const d = await apiGet('/api/users/drivers')
         setDriverOptions(Array.isArray(d?.users) ? d.users : [])
       } catch {
@@ -254,6 +261,33 @@ export default function UserOrders() {
       }
     })()
   }, [])
+
+  async function assignManager(orderId, managerId) {
+    const key = `mgr-${String(orderId)}`
+    setUpdating((prev) => ({ ...prev, [key]: true }))
+    try {
+      await preserveScroll(async () => {
+        const payload = { managerId: managerId ? String(managerId) : '' }
+        const r = await apiPost(`/api/orders/${orderId}/assign-manager`, payload)
+        const updated = r?.order
+        if (updated) {
+          setOrders((prev) =>
+            prev.map((o) => (String(o._id) === String(orderId) ? updated : o))
+          )
+        } else {
+          await loadOrders(true)
+        }
+      })
+    } catch (e) {
+      toast.error(e?.message || 'Failed to assign manager')
+    } finally {
+      setUpdating((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+    }
+  }
 
   // Single unified search via backend 'q' covers invoice (with or without '#'), product names, agent/driver names, city, phone, and details
 
@@ -1713,6 +1747,38 @@ export default function UserOrders() {
                     <div className="helper">
                       Total: {targetCode} {price.toFixed(0)}
                     </div>
+                  </div>
+                  <div>
+                    <div className="label">Assign Manager</div>
+                    {Array.isArray(managerOptions) && managerOptions.length ? (
+                      <div style={{ display: 'grid', gap: 8 }}>
+                        <select
+                          className="input"
+                          value={String(o?.assignedManager?._id || o?.assignedManager || '')}
+                          onChange={(e) => assignManager(id, e.target.value)}
+                          disabled={!!updating[`mgr-${id}`]}
+                        >
+                          <option value="">-- Unassigned --</option>
+                          {managerOptions.map((m) => (
+                            <option key={String(m._id || m.id)} value={String(m._id || m.id)}>
+                              {`${m.firstName || ''} ${m.lastName || ''}`.trim() || (m.email || 'Manager')}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="helper">
+                          Current:{' '}
+                          {(() => {
+                            const am = o?.assignedManager
+                            if (!am) return '—'
+                            if (typeof am === 'string') return 'Assigned'
+                            const name = `${am.firstName || ''} ${am.lastName || ''}`.trim()
+                            return name || am.email || 'Assigned'
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="helper">No managers</div>
+                    )}
                   </div>
                   <div>
                     <div className="label">Assign Driver</div>

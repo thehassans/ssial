@@ -305,24 +305,11 @@ router.get(
         cond.createdBy = req.user.id;
       } else if (req.user.role === "manager") {
         const mgr = await User.findById(req.user.id)
-          .select("createdBy assignedCountry assignedCountries")
+          .select("createdBy")
           .lean();
         const ownerId = String(mgr?.createdBy || "");
         if (!ownerId) return res.json({ users: [] });
         cond.createdBy = ownerId;
-        const assigned =
-          Array.isArray(mgr?.assignedCountries) && mgr.assignedCountries.length
-            ? mgr.assignedCountries
-            : mgr?.assignedCountry
-            ? [mgr.assignedCountry]
-            : [];
-        if (assigned.length) {
-          const set = new Set();
-          for (const c of assigned) {
-            for (const x of expand(c)) set.add(x);
-          }
-          cond.country = { $in: Array.from(set) };
-        }
       }
       const country = String(req.query.country || "").trim();
       if (country) {

@@ -55,6 +55,14 @@ const OrderSchema = new mongoose.Schema(
     courierName: { type: String },
     trackingNumber: { type: String },
     deliveryBoy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    assignedManager: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    assignedManagerAt: { type: Date },
+    assignedManagerBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     driverCommission: { type: Number, default: 0 },
     shippingFee: { type: Number, default: 0 },
     codAmount: { type: Number, default: 0 },
@@ -150,6 +158,7 @@ OrderSchema.index({ orderCountry: 1 });
 OrderSchema.index({ city: 1 });
 OrderSchema.index({ createdBy: 1 });
 OrderSchema.index({ deliveryBoy: 1 });
+OrderSchema.index({ assignedManager: 1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ shipmentStatus: 1 });
 OrderSchema.index({ createdAt: -1 });
