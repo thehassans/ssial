@@ -486,6 +486,9 @@ export default function Sidebar({
     const key = item.label
     const isOpen = openGroups.has(key)
 
+    const visibleChildren = (item.children || []).filter((ch) => !(hiddenItems && hiddenItems.includes(ch.label)))
+    const isGroupHidden = isHidden || visibleChildren.length === 0
+
     // Premium Floating Menu Logic for Closed State
     const [isHovered, setIsHovered] = useState(false)
 
@@ -496,7 +499,7 @@ export default function Sidebar({
           className="nav-group closed-group"
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          style={{ display: isHidden ? 'none' : undefined }}
+          style={{ display: isGroupHidden ? 'none' : undefined }}
         >
           <div
             className="group-header"
@@ -517,7 +520,7 @@ export default function Sidebar({
             <div className="floating-submenu">
               <div className="floating-header">{item.label}</div>
               <div className="floating-content">
-                {item.children.map((ch) => {
+                {visibleChildren.map((ch) => {
                   const badge = ch.badge && Number(ch.badge) > 0 ? Number(ch.badge) : null
                   return (
                     <NavLink
@@ -549,7 +552,7 @@ export default function Sidebar({
       <div
         key={key}
         className={`nav-group ${isOpen ? 'open' : ''}`}
-        style={{ display: isHidden ? 'none' : undefined }}
+        style={{ display: isGroupHidden ? 'none' : undefined }}
       >
         <button
           type="button"
@@ -568,7 +571,7 @@ export default function Sidebar({
           </span>
         </button>
         <div id={`submenu-${key}`} className="submenu" aria-hidden={!isOpen}>
-          {item.children.map((ch) => {
+          {visibleChildren.map((ch) => {
             const badge = ch.badge && Number(ch.badge) > 0 ? Number(ch.badge) : null
             return (
               <NavLink
