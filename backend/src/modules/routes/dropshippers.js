@@ -106,8 +106,9 @@ router.get("/dashboard", auth, allowRoles("dropshipper"), async (req, res) => {
     };
 
     statusCounts.forEach((s) => {
-      if (stats.hasOwnProperty(s._id)) {
-        stats[s._id] = s.count;
+      const k = String(s._id || '').toLowerCase();
+      if (stats.hasOwnProperty(k)) {
+        stats[k] = s.count;
       }
     });
 
@@ -120,7 +121,7 @@ router.get("/dashboard", auth, allowRoles("dropshipper"), async (req, res) => {
       {
         $match: {
           createdBy: userObjectId,
-          shipmentStatus: "delivered",
+          shipmentStatus: { $regex: /^delivered$/i },
         },
       },
       {
@@ -194,7 +195,7 @@ router.post("/recalculate-profits/:dropshipperId", auth, allowRoles("admin", "us
     // Find all delivered orders by this dropshipper
     const orders = await Order.find({ 
       createdBy: dropshipperId, 
-      shipmentStatus: 'delivered' 
+      shipmentStatus: { $regex: /^delivered$/i }
     }).populate('productId', 'price dropshippingPrice purchasePrice').populate('items.productId', 'price dropshippingPrice purchasePrice');
 
     let updatedCount = 0;
@@ -205,7 +206,7 @@ router.post("/recalculate-profits/:dropshipperId", auth, allowRoles("admin", "us
       // Dropshipper pays: dropshippingPrice for 1 unit + purchasePrice for rest
       // Dropshipper earns: orderTotal - what they pay
       let dropshipperPays = 0;
-      const orderTotal = order.total || 0;
+      const orderTotal = order.total || order.codAmount || order.collectedAmount || 0;
 
       if (order.items && order.items.length > 0) {
         // Find the item with highest dropshipping price
@@ -284,7 +285,7 @@ router.post("/recalculate-my-profits", auth, allowRoles("dropshipper"), async (r
     // Find all delivered orders by this dropshipper
     const orders = await Order.find({ 
       createdBy: dropshipperId, 
-      shipmentStatus: 'delivered' 
+      shipmentStatus: { $regex: /^delivered$/i }
     }).populate('productId', 'price dropshippingPrice purchasePrice').populate('items.productId', 'price dropshippingPrice purchasePrice');
 
     let updatedCount = 0;
@@ -295,7 +296,7 @@ router.post("/recalculate-my-profits", auth, allowRoles("dropshipper"), async (r
       // Dropshipper pays: dropshippingPrice for 1 unit + purchasePrice for rest
       // Dropshipper earns: orderTotal - what they pay
       let dropshipperPays = 0;
-      const orderTotal = order.total || 0;
+      const orderTotal = order.total || order.codAmount || order.collectedAmount || 0;
 
       if (order.items && order.items.length > 0) {
         // Find the item with highest dropshipping price
@@ -382,33 +383,140 @@ router.get("/finances", auth, allowRoles("dropshipper"), async (req, res) => {
 
      const query = {
        createdBy: userObjectId,
-       shipmentStatus: "delivered" // Only delivered orders count for profit
+       shipmentStatus: { $regex: /^delivered$/i } // Only delivered orders count for profit
      };
 
      const total = await Order.countDocuments(query);
      const orders = await Order.find(query)
        .select(
-         "invoiceNumber customerName dropshipperProfit total shippingFee deliveredAt createdAt items quantity productId"
+         "invoiceNumber customerName dropshipperProfit total codAmount collectedAmount shippingFee deliveredAt createdAt items quantity productId"
        )
        .sort({ deliveredAt: -1 })
        .skip(skip)
        .limit(limit)
        .lean();
-      
-      // Calculate summary
+
+      const orderTotalValue = (o) => {
+        const t = Number(o?.total ?? 0);
+        if (Number.isFinite(t) && t > 0) return t;
+        const cod = Number(o?.codAmount ?? 0);
+        if (Number.isFinite(cod) && cod > 0) return cod;
+        const col = Number(o?.collectedAmount ?? 0);
+        if (Number.isFinite(col) && col > 0) return col;
+        return 0;
+      };
+
+      const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+      const toItemList = (o) => {
+        if (Array.isArray(o?.items) && o.items.length > 0) return o.items;
+        if (o?.productId) return [{ productId: o.productId, quantity: o.quantity || 1 }];
+        return [];
+      };
+
+      const needsFix = (o) => {
+        const totalVal = orderTotalValue(o);
+        if (!(totalVal > 0)) return false;
+        const existing = Number(o?.dropshipperProfit?.amount || 0);
+        if (!Number.isFinite(existing) || existing <= 0) return true;
+        return false;
+      };
+
+      const toPidStrings = (o) => {
+        const out = [];
+        for (const it of toItemList(o)) {
+          const pid = it?.productId || it?.product;
+          if (pid) out.push(String(pid));
+        }
+        return out;
+      };
+
+      const computeProfitAmount = (o, prodMap) => {
+        const list = toItemList(o);
+        const orderTotal = orderTotalValue(o);
+        if (!list.length) return 0;
+
+        let maxIdx = -1;
+        let maxDropPrice = -Infinity;
+        for (let i = 0; i < list.length; i++) {
+          const pid = list[i]?.productId || list[i]?.product;
+          if (!pid) continue;
+          const prod = prodMap.get(String(pid));
+          if (!prod) continue;
+          const dropPrice = prod.dropshippingPrice != null ? prod.dropshippingPrice : prod.price || 0;
+          if (Number(dropPrice) > maxDropPrice) {
+            maxDropPrice = Number(dropPrice);
+            maxIdx = i;
+          }
+        }
+
+        let dropshipperPays = 0;
+        for (let i = 0; i < list.length; i++) {
+          const pid = list[i]?.productId || list[i]?.product;
+          if (!pid) continue;
+          const prod = prodMap.get(String(pid));
+          if (!prod) continue;
+          const qty = Math.max(1, Number(list[i]?.quantity || 1));
+          const dropPrice = prod.dropshippingPrice != null ? prod.dropshippingPrice : prod.price || 0;
+          const purchPrice = prod.purchasePrice != null ? prod.purchasePrice : prod.price || 0;
+          if (i === maxIdx) {
+            dropshipperPays += Number(dropPrice) + Number(purchPrice) * (qty - 1);
+          } else {
+            dropshipperPays += Number(purchPrice) * qty;
+          }
+        }
+
+        return round2(Math.max(0, Number(orderTotal || 0) - Number(dropshipperPays || 0)));
+      };
+
+      const fixTargets = (orders || []).filter(needsFix);
+      if (fixTargets.length > 0) {
+        const productIds = new Set();
+        for (const o of fixTargets) {
+          for (const pid of toPidStrings(o)) productIds.add(pid);
+        }
+
+        const prods = await Product.find({ _id: { $in: Array.from(productIds) } })
+          .select("price dropshippingPrice purchasePrice")
+          .lean();
+        const prodMap = new Map((prods || []).map((p) => [String(p._id), p]));
+
+        const ops = [];
+        for (const o of fixTargets) {
+          const nextAmount = computeProfitAmount(o, prodMap);
+          if (!(nextAmount > 0)) continue;
+          const existing = Number(o?.dropshipperProfit?.amount || 0);
+          if (Math.abs(Number(nextAmount) - Number(existing)) <= 0.01) continue;
+          if (!o.dropshipperProfit) o.dropshipperProfit = {};
+          o.dropshipperProfit.amount = nextAmount;
+          ops.push({
+            updateOne: {
+              filter: { _id: o._id },
+              update: { $set: { "dropshipperProfit.amount": nextAmount } },
+            },
+          });
+        }
+
+        if (ops.length > 0) {
+          await Order.bulkWrite(ops, { ordered: false });
+        }
+      }
+
       const summaryAgg = await Order.aggregate([
         { $match: query },
-        { $group: { 
-            _id: null, 
+        {
+          $group: {
+            _id: null,
             totalAmount: { $sum: "$dropshipperProfit.amount" },
             paidAmount: { $sum: { $cond: ["$dropshipperProfit.isPaid", "$dropshipperProfit.amount", 0] } },
-            unpaidAmount: { $sum: { $cond: ["$dropshipperProfit.isPaid", 0, "$dropshipperProfit.amount"] } }
-        }}
+            unpaidAmount: { $sum: { $cond: ["$dropshipperProfit.isPaid", 0, "$dropshipperProfit.amount"] } },
+          },
+        },
       ]);
       const summary = summaryAgg[0] || { totalAmount: 0, paidAmount: 0, unpaidAmount: 0 };
 
      const normalizedOrders = (orders || []).map((o) => {
-       const totalPrice = Number(o.total || 0);
+       const totalPrice = Number(orderTotalValue(o) || 0);
        const shippingCost = Number(o.shippingFee || 0);
        const profit = Number(o.dropshipperProfit?.amount || 0);
        const subtotal = Math.max(0, totalPrice - shippingCost);

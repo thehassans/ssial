@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { apiGet, apiPost } from '../../api'
+import { apiGet, apiPost, clearApiCache } from '../../api'
 import { useToast } from '../../ui/Toast.jsx'
 
 export default function DropshipperFinances() {
@@ -14,15 +14,52 @@ export default function DropshipperFinances() {
   const [requesting, setRequesting] = useState(false)
 
   useEffect(() => {
-    load()
+    load({ allowAutoFix: true })
   }, [])
 
-  async function load() {
+  async function load({ allowAutoFix = false } = {}) {
+    setLoading(true)
     try {
-      const [res, reqs] = await Promise.all([
-        apiGet('/api/dropshippers/finances'),
-        apiGet('/api/dropshippers/payout-requests/me').catch(() => ({ requests: [] }))
+      clearApiCache('/api/dropshippers/finances')
+      clearApiCache('/api/dropshippers/payout-requests/me')
+
+      let [res, reqs] = await Promise.all([
+        apiGet('/api/dropshippers/finances', { skipCache: true }),
+        apiGet('/api/dropshippers/payout-requests/me', { skipCache: true }).catch(() => ({ requests: [] }))
       ])
+
+      const shouldAutoFix = (() => {
+        if (!allowAutoFix) return false
+        const totalOrders = Number(res?.pagination?.total || res?.orders?.length || 0)
+        if (totalOrders <= 0) return false
+        const totalProfit = Number(res?.totalProfit || 0)
+        if (Number.isFinite(totalProfit) && totalProfit > 0) return false
+
+        const last = Number(localStorage.getItem('ds-auto-profit-recalc-ts') || 0)
+        if (last && Date.now() - last < 10 * 60 * 1000) return false
+        return true
+      })()
+
+      if (shouldAutoFix) {
+        try {
+          localStorage.setItem('ds-auto-profit-recalc-ts', String(Date.now()))
+        } catch {}
+        setRecalculating(true)
+        try {
+          await apiPost('/api/dropshippers/recalculate-my-profits', {})
+          clearApiCache('/api/dropshippers/finances')
+          clearApiCache('/api/dropshippers/payout-requests/me')
+          ;[res, reqs] = await Promise.all([
+            apiGet('/api/dropshippers/finances', { skipCache: true }),
+            apiGet('/api/dropshippers/payout-requests/me', { skipCache: true }).catch(() => ({ requests: [] }))
+          ])
+        } catch (err) {
+          console.error(err)
+        } finally {
+          setRecalculating(false)
+        }
+      }
+
       setData(res)
       setMyPayoutRequests(Array.isArray(reqs?.requests) ? reqs.requests : [])
     } catch (err) {
@@ -58,7 +95,6 @@ export default function DropshipperFinances() {
     try {
       const result = await apiPost('/api/dropshippers/recalculate-my-profits', {})
       toast.success(`✅ ${result.message || 'Profits recalculated successfully!'}`)
-      setLoading(true)
       await load()
     } catch (err) {
       toast.error(err?.message || 'Failed to recalculate profits')
