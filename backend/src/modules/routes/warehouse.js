@@ -449,6 +449,31 @@ router.post('/add-stock/:productId', auth, allowRoles('admin','user','manager'),
       return res.status(400).json({ message: 'Country and valid quantity are required' })
     }
 
+    const normalizeCountry = (c) => {
+      const raw = String(c || '').trim()
+      const up = raw.toUpperCase()
+      if (up === 'SA' || up === 'SAUDI ARABIA' || up === 'KSA') return 'KSA'
+      if (up === 'AE' || up === 'UNITED ARAB EMIRATES' || up === 'UAE') return 'UAE'
+      if (up === 'OM' || up === 'OMAN') return 'Oman'
+      if (up === 'BH' || up === 'BAHRAIN') return 'Bahrain'
+      if (up === 'IN' || up === 'INDIA') return 'India'
+      if (up === 'KW' || up === 'KUWAIT') return 'Kuwait'
+      if (up === 'QA' || up === 'QATAR') return 'Qatar'
+      if (up === 'PK' || up === 'PAKISTAN') return 'Pakistan'
+      if (up === 'JO' || up === 'JORDAN') return 'Jordan'
+      if (up === 'US' || up === 'USA' || up === 'UNITED STATES' || up === 'UNITED STATES OF AMERICA') return 'USA'
+      if (up === 'GB' || up === 'UK' || up === 'UNITED KINGDOM') return 'UK'
+      if (up === 'CA' || up === 'CANADA') return 'Canada'
+      if (up === 'AU' || up === 'AUSTRALIA') return 'Australia'
+      return raw
+    }
+
+    const normalizedCountry = normalizeCountry(country)
+    const addQuantity = Number(quantity)
+    if (!Number.isFinite(addQuantity) || addQuantity <= 0) {
+      return res.status(400).json({ message: 'Country and valid quantity are required' })
+    }
+
     const product = await Product.findById(productId)
     
     if (!product) {
@@ -478,8 +503,8 @@ router.post('/add-stock/:productId', auth, allowRoles('admin','user','manager'),
     // Add to stock history
     const historyEntry = {
       date: new Date(),
-      country: country,
-      quantity: Number(quantity),
+      country: normalizedCountry,
+      quantity: addQuantity,
       notes: notes || '',
       addedBy: req.user.id
     }
@@ -490,18 +515,21 @@ router.post('/add-stock/:productId', auth, allowRoles('admin','user','manager'),
     product.stockHistory.push(historyEntry)
 
     // Update stockByCountry - ADD to existing stock
-    if (!product.stockByCountry) {
+    const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v)
+    if (!isObj(product.stockByCountry)) {
       product.stockByCountry = {}
     }
-    const currentCountryStock = Number(product.stockByCountry[country] || 0)
-    const addQuantity = Number(quantity)
-    product.stockByCountry[country] = currentCountryStock + addQuantity
+    const currentCountryStock = Number(product.stockByCountry[normalizedCountry] || 0)
+    product.stockByCountry[normalizedCountry] = currentCountryStock + addQuantity
+    product.markModified('stockByCountry')
 
     // Recalculate total stock quantity from all countries
+    const stockObj = typeof product.stockByCountry?.toObject === 'function' ? product.stockByCountry.toObject() : (product.stockByCountry || {})
     let totalStock = 0
-    Object.values(product.stockByCountry).forEach(val => {
-      totalStock += Number(val || 0)
-    })
+    for (const v of Object.values(stockObj)) {
+      const n = Number(v)
+      if (Number.isFinite(n)) totalStock += n
+    }
     product.stockQty = totalStock
     product.inStock = totalStock > 0
 
@@ -517,7 +545,7 @@ router.post('/add-stock/:productId', auth, allowRoles('admin','user','manager'),
     })
   } catch (err) {
     console.error('add-stock error', err)
-    res.status(500).json({ message: 'Failed to add stock' })
+    res.status(500).json({ message: err?.message || 'Failed to add stock' })
   }
 })
 

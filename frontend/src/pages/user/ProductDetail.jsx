@@ -316,7 +316,8 @@ export default function ProductDetail() {
     try {
       await apiPost(`/api/warehouse/add-stock/${id}`, {
         country: addStockForm.country,
-        quantity: Number(addStockForm.quantity)
+        quantity: Number(addStockForm.quantity),
+        notes: String(addStockForm.notes || '').trim()
       })
       
       toast.success(`✅ Added ${addStockForm.quantity} units to ${addStockForm.country} stock!`, {
@@ -329,7 +330,7 @@ export default function ProductDetail() {
       })
       
       setShowAddStock(false)
-      setAddStockForm({ country: 'UAE', quantity: '' })
+      setAddStockForm({ country: 'UAE', quantity: '', notes: '' })
       await loadProductAndOrders()
     } catch (err) {
       console.error('Failed to add stock:', err)
