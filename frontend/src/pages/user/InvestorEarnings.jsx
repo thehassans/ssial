@@ -246,6 +246,7 @@ export default function InvestorEarnings() {
           <option value="all">All Investors</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
+          <option value="completed">Completed</option>
         </select>
         <input
           type="date"
@@ -570,8 +571,8 @@ export default function InvestorEarnings() {
                         <span style={{
                           padding: '6px 14px',
                           borderRadius: 20,
-                          background: inv.status === 'active' ? '#10b98115' : '#6b728015',
-                          color: inv.status === 'active' ? '#10b981' : '#6b7280',
+                          background: inv.status === 'active' ? '#10b98115' : inv.status === 'completed' ? '#10b98110' : '#6b728015',
+                          color: inv.status === 'active' ? '#10b981' : inv.status === 'completed' ? '#10b981' : '#6b7280',
                           fontWeight: 600,
                           fontSize: 12,
                           textTransform: 'capitalize'

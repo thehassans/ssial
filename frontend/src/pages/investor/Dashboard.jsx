@@ -83,6 +83,13 @@ export default function InvestorDashboard() {
     currency 
   } = investorProfile
 
+  const status = String(investorProfile?.status || 'inactive')
+  const statusLabel = status === 'completed' ? 'Completed' : status === 'active' ? 'Active' : 'Paused'
+  const targetProfit = Number(investorProfile?.profitAmount || 0)
+  const earnedNum = Number(earnedProfit || 0)
+  const remainingProfit = targetProfit > 0 ? Math.max(0, targetProfit - earnedNum) : 0
+  const progressPct = targetProfit > 0 ? Math.min(100, (earnedNum / targetProfit) * 100) : 0
+
   // Calculate real daily profit based on total earned / days
   const daysSinceCreation = Math.max(1, Math.floor((new Date() - new Date(createdAt)) / (1000 * 60 * 60 * 24)))
   const avgDailyProfit = Number(earnedProfit || 0) / daysSinceCreation
@@ -102,8 +109,8 @@ export default function InvestorDashboard() {
           <h1 className="id-name">{firstName || 'Investor'}</h1>
         </div>
         <div className="id-live-indicator">
-          <span className="blink-dot"></span>
-          Live Market
+          {status === 'active' ? <span className="blink-dot"></span> : null}
+          {statusLabel}
         </div>
       </div>
 
@@ -198,6 +205,26 @@ export default function InvestorDashboard() {
           </div>
         </div>
       </div>
+
+      {targetProfit > 0 && (
+        <div className="id-progress-card">
+          <div className="id-progress-top">
+            <div>
+              <div className="id-progress-label">Profit Target</div>
+              <div className="id-progress-value">
+                {earnedNum.toLocaleString()} / {targetProfit.toLocaleString()} <span className="currency">{currency}</span>
+              </div>
+            </div>
+            <div className={`id-status-pill ${status}`}>{statusLabel}</div>
+          </div>
+          <div className="id-progress-bar" role="progressbar" aria-valuenow={Math.round(progressPct)} aria-valuemin={0} aria-valuemax={100}>
+            <div className="id-progress-fill" style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className="id-progress-sub">
+            Remaining: {remainingProfit.toLocaleString()} {currency}
+          </div>
+        </div>
+      )}
 
       {/* Live Activity Feed */}
       <div className="id-activity-feed">

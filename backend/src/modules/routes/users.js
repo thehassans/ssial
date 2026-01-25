@@ -21,7 +21,6 @@ async function getWA() {
 }
 import ChatAssignment from "../models/ChatAssignment.js";
 import Order from "../models/Order.js";
-import DailyProfit from "../models/DailyProfit.js";
 import PayoutRequest from "../models/PayoutRequest.js";
 import mongoose from "mongoose";
 import { createNotification } from "../routes/notifications.js";
@@ -657,13 +656,7 @@ router.get("/me", auth, async (req, res) => {
 
   if (u.role === "investor") {
     try {
-      const earnedAgg = await DailyProfit.aggregate([
-        { $match: { investor: u._id } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]);
-      const earned = Number(
-        earnedAgg?.[0]?.total ?? u?.investorProfile?.earnedProfit ?? 0
-      );
+      const earned = Number(u?.investorProfile?.earnedProfit ?? 0);
       const payoutAgg = await PayoutRequest.aggregate([
         {
           $match: {

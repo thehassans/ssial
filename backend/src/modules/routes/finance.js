@@ -4447,24 +4447,22 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
 
     // Build user query for investors
     const userQuery = { role: "investor" };
+    if (req.user.role === "user") {
+      userQuery.createdBy = req.user.id;
+    }
     if (status === "active") {
-      userQuery.isActive = true;
+      userQuery["investorProfile.status"] = "active";
     } else if (status === "inactive") {
-      userQuery.isActive = false;
+      userQuery["investorProfile.status"] = "inactive";
+    } else if (status === "completed") {
+      userQuery["investorProfile.status"] = "completed";
     }
 
     const investors = await User.find(userQuery)
-      .select("firstName lastName email investorProfile isActive")
+      .select("firstName lastName email investorProfile")
       .lean();
 
     // Get earnings for each investor
-    // 1. Aggregate actual profits from DailyProfit collection
-    const profitAgg = await DailyProfit.aggregate([
-      { $group: { _id: "$investor", total: { $sum: "$amount" } } }
-    ]);
-    const profitMap = {};
-    profitAgg.forEach(p => { profitMap[String(p._id)] = p.total });
-
     const payoutAgg = await PayoutRequest.aggregate([
       {
         $match: {
@@ -4489,8 +4487,8 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
       const profile = inv.investorProfile || {};
       const invested = profile.investmentAmount || profile.totalInvested || 0;
       
-      // Use real aggregated profit if available, fallback to profile
-      const earnedProfit = profitMap[String(inv._id)] || profile.earnedProfit || 0;
+      // Source of truth: investorProfile.earnedProfit (updated on order delivery)
+      const earnedProfit = profile.earnedProfit || 0;
 
       const pending = payoutMap[`${String(inv._id)}:pending`] || 0;
       const approved = payoutMap[`${String(inv._id)}:approved`] || 0;
@@ -4501,12 +4499,13 @@ router.get("/investors/earnings", auth, allowRoles("user", "admin"), async (req,
       
       // Total return is investment + profit
       const totalReturn = invested + earnedProfit;
+      const profStatus = String(profile.status || "inactive");
 
       return {
         _id: inv._id,
         name: `${inv.firstName || ''} ${inv.lastName || ''}`.trim() || "Unknown",
         email: inv.email,
-        status: inv.isActive !== false ? "active" : "inactive",
+        status: profStatus,
         invested: invested,
         returns: totalReturn,
         profit: earnedProfit,
@@ -4572,21 +4571,32 @@ router.get(
 // Get investor payout requests (for admin/user panel)
 router.get("/investors/payout-requests", auth, allowRoles("user", "admin"), async (req, res) => {
   try {
-    const requests = await PayoutRequest.find({ requesterType: "investor" })
+    const query = { requesterType: "investor" };
+    if (req.user.role === "user") {
+      const investorIds = await User.find(
+        { role: "investor", createdBy: req.user.id },
+        { _id: 1 }
+      )
+        .lean()
+        .then((list) => list.map((u) => u._id));
+      query.requesterId = { $in: investorIds };
+    }
+
+    const requests = await PayoutRequest.find(query)
       .sort({ createdAt: -1 })
       .limit(100)
+      .populate("requesterId", "firstName lastName email createdBy")
       .lean();
 
-    // Add requester names
-    const enriched = await Promise.all(
-      requests.map(async (r) => {
-        const user = await User.findById(r.requesterId).select("firstName lastName").lean();
-        return {
-          ...r,
-          investorName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "Unknown"
-        };
-      })
-    );
+    const enriched = (requests || []).map((r) => {
+      const u = r?.requesterId && typeof r.requesterId === "object" ? r.requesterId : null;
+      return {
+        ...r,
+        investorName: u
+          ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email || "Unknown"
+          : "Unknown",
+      };
+    });
 
     res.json({ requests: enriched });
   } catch (error) {
@@ -4610,13 +4620,7 @@ router.post("/investors/payout-requests", auth, allowRoles("investor"), async (r
     }
 
     const user = await User.findById(req.user.id).select("firstName lastName investorProfile").lean();
-    const earnedAgg = await DailyProfit.aggregate([
-      { $match: { investor: user?._id } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
-    ]);
-    const earned = Number(
-      earnedAgg?.[0]?.total ?? user?.investorProfile?.earnedProfit ?? 0
-    );
+    const earned = Number(user?.investorProfile?.earnedProfit ?? 0);
     const payoutAgg = await PayoutRequest.aggregate([
       {
         $match: {
@@ -4681,6 +4685,17 @@ router.post("/investors/payout-requests/:id/approve", auth, allowRoles("user", "
       return res.status(400).json({ message: "Request already processed" });
     }
 
+    if (req.user.role === "user") {
+      const investor = await User.findOne({
+        _id: request.requesterId,
+        role: "investor",
+        createdBy: req.user.id,
+      }).select("_id");
+      if (!investor) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
+    }
+
     request.status = "approved";
     request.processedBy = req.user.id;
     request.processedAt = new Date();
@@ -4706,6 +4721,17 @@ router.post("/investors/payout-requests/:id/reject", auth, allowRoles("user", "a
     }
     if (request.status !== "pending") {
       return res.status(400).json({ message: "Request already processed" });
+    }
+
+    if (req.user.role === "user") {
+      const investor = await User.findOne({
+        _id: request.requesterId,
+        role: "investor",
+        createdBy: req.user.id,
+      }).select("_id");
+      if (!investor) {
+        return res.status(403).json({ message: "Not allowed" });
+      }
     }
 
     request.status = "rejected";

@@ -1958,7 +1958,7 @@ export default function UserOrders() {
                       </div>
                     )}
                     {/* Investor Profit - Minimal with name */}
-                    {investorProfit > 0 && (
+                    {(o.investorProfit?.investor || o.investorProfit?.investorName) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                         <span style={{ color: 'var(--muted)' }}>💎 Investor{o.investorProfit?.investorName ? ` (${o.investorProfit.investorName})` : ''}:</span>
                         <span style={{ fontWeight: 600, color: o.investorProfit?.isPending ? '#d97706' : '#059669' }}>

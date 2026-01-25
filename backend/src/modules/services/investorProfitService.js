@@ -2,6 +2,63 @@ import User from "../models/User.js";
 import Order from "../models/Order.js";
 import Reference from "../models/Reference.js";
 
+async function getWorkspaceNetFactor(ownerId) {
+  try {
+    const refs = await Reference.find({ userId: ownerId }).select("profitRate").lean();
+    const totalRate = (refs || []).reduce((sum, r) => sum + Number(r?.profitRate || 0), 0);
+    const factor = 1 - totalRate / 100;
+    return factor > 0 ? factor : 0;
+  } catch {
+    return 1;
+  }
+}
+
+async function getPendingGrossProfitMap(investorIds) {
+  const ids = Array.isArray(investorIds) ? investorIds.filter(Boolean) : [];
+  if (ids.length === 0) return new Map();
+  const rows = await Order.aggregate([
+    {
+      $match: {
+        "investorProfit.investor": { $in: ids },
+        "investorProfit.isPending": true,
+      },
+    },
+    { $group: { _id: "$investorProfit.investor", pending: { $sum: "$investorProfit.profitAmount" } } },
+  ]);
+  const map = new Map();
+  for (const r of rows || []) map.set(String(r._id), Number(r?.pending || 0));
+  return map;
+}
+
+async function pickEligibleInvestor(ownerId) {
+  const investors = await User.find({
+    role: "investor",
+    createdBy: ownerId,
+    "investorProfile.status": "active",
+  })
+    .select("firstName lastName email investorProfile createdAt")
+    .sort({ createdAt: 1 })
+    .lean();
+
+  if (!investors || investors.length === 0) return null;
+  const netFactor = await getWorkspaceNetFactor(ownerId);
+  const pendingMap = await getPendingGrossProfitMap(investors.map((i) => i._id));
+
+  for (const inv of investors) {
+    const profile = inv?.investorProfile || {};
+    const target = Number(profile.profitAmount || 0);
+    const earned = Number(profile.earnedProfit || 0);
+    const pendingGross = Number(pendingMap.get(String(inv._id)) || 0);
+    const pendingNet = pendingGross * netFactor;
+    const remainingNet = target > 0 ? target - earned - pendingNet : Infinity;
+    if (remainingNet > 0 && Number(profile.profitPercentage || 0) > 0) {
+      return { investor: inv, remainingNet, netFactor };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Pre-assign an investor to an order when it's created
  * This sets the expected investor but doesn't add profit yet (pending until delivered)
@@ -14,16 +71,22 @@ export async function preAssignInvestorToOrder(order, ownerId, orderTotal) {
   try {
     if (!order || !ownerId) return null;
 
-    // Find the first active investor for this workspace (FIFO by createdAt)
-    const investor = await User.findOne({
-      role: "investor",
-      createdBy: ownerId,
-      "investorProfile.status": "active",
-    }).sort({ createdAt: 1 });
-
-    if (!investor) {
-      return null;
+    if (order.investorProfit?.investor) {
+      const existing = order.investorProfit || {};
+      return {
+        investorId: existing.investor,
+        investorName: existing.investorName,
+        profitPercentage: Number(existing.profitPercentage || 0),
+        expectedProfit: Number(existing.profitAmount || 0),
+      };
     }
+
+    const picked = await pickEligibleInvestor(ownerId);
+    if (!picked?.investor) return null;
+
+    const investor = picked.investor;
+    const remainingNet = Number(picked.remainingNet || 0);
+    const netFactor = Number(picked.netFactor || 1);
 
     const profile = investor.investorProfile || {};
     const profitPercentage = Number(profile.profitPercentage || 0);
@@ -32,9 +95,22 @@ export async function preAssignInvestorToOrder(order, ownerId, orderTotal) {
       return null;
     }
 
+    if (!Number.isFinite(netFactor) || netFactor <= 0) {
+      return null;
+    }
+
     // Calculate expected profit for this order
     const total = Number(orderTotal || order.total || 0);
-    const expectedProfit = Math.round((total * profitPercentage / 100) * 100) / 100;
+    let expectedProfit = Math.round((total * profitPercentage / 100) * 100) / 100;
+    if (Number.isFinite(remainingNet) && remainingNet > 0) {
+      const maxGross = remainingNet / netFactor;
+      if (Number.isFinite(maxGross) && maxGross > 0) {
+        expectedProfit = Math.min(expectedProfit, maxGross);
+        expectedProfit = Math.round(expectedProfit * 100) / 100;
+      }
+    }
+
+    if (!Number.isFinite(expectedProfit) || expectedProfit <= 0) return null;
 
     // Set investor info on order (pending until delivered)
     order.investorProfit = {
@@ -70,6 +146,10 @@ export async function finalizeInvestorProfit(order, ownerId) {
   try {
     if (!order || !ownerId) return null;
 
+    if (order.investorProfit?.investor && order.investorProfit?.isPending === false) {
+      return null;
+    }
+
     // Check if order already has an assigned investor
     let investorId = order.investorProfit?.investor;
     let profitAmount = order.investorProfit?.profitAmount || 0;
@@ -84,7 +164,7 @@ export async function finalizeInvestorProfit(order, ownerId) {
 
     // Get investor
     const investor = await User.findById(investorId);
-    if (!investor || investor.investorProfile?.status !== "active") {
+    if (!investor) {
       console.log("[InvestorProfit] Investor not found or not active");
       return null;
     }
@@ -100,6 +180,34 @@ export async function finalizeInvestorProfit(order, ownerId) {
     }
 
     if (profitAmount <= 0) return null;
+
+    // Clamp profit to remaining target (net of reference deduction)
+    const netFactor = await getWorkspaceNetFactor(ownerId);
+    const remainingNet = profitTarget > 0 ? profitTarget - currentEarned : Infinity;
+    if (profitTarget > 0 && remainingNet <= 0) {
+      if (order.investorProfit) {
+        order.investorProfit.isPending = false;
+        order.investorProfit.profitAmount = 0;
+        await order.save();
+      }
+      return investor;
+    }
+    if (profitTarget > 0 && Number.isFinite(netFactor) && netFactor > 0) {
+      const maxGross = remainingNet / netFactor;
+      if (Number.isFinite(maxGross) && maxGross > 0) {
+        profitAmount = Math.min(profitAmount, maxGross);
+        profitAmount = Math.round(profitAmount * 100) / 100;
+      }
+    }
+
+    if (profitAmount <= 0) {
+      if (order.investorProfit) {
+        order.investorProfit.isPending = false;
+        order.investorProfit.profitAmount = 0;
+        await order.save();
+      }
+      return investor;
+    }
 
     // Calculate reference profit deduction from investor amount
     let referenceDeduction = 0;

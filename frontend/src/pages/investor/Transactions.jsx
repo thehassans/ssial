@@ -193,12 +193,14 @@ export default function Transactions() {
           padding: 20
         }}>
           <div style={{
-            background: 'white',
+            background: 'var(--il-card-bg)',
             borderRadius: 24,
             padding: 32,
             maxWidth: 440,
             width: '100%',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            border: '1px solid var(--il-glass-border)',
+            color: 'var(--il-text)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
               <div style={{
@@ -216,26 +218,26 @@ export default function Transactions() {
                 </svg>
               </div>
               <div>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Payout</h3>
-                <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--il-text)', margin: 0 }}>Payout</h3>
+                <p style={{ fontSize: 13, color: 'var(--il-text-muted)', margin: 0 }}>
                   {pendingRequest ? 'Status: Pending approval' : 'Withdraw full available balance'}
                 </p>
               </div>
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--il-text)', marginBottom: 8 }}>
                 Amount ({currency})
               </label>
               <div style={{
                 width: '100%',
                 padding: '14px 16px',
                 borderRadius: 12,
-                border: '2px solid #e2e8f0',
+                border: '1px solid var(--il-glass-border)',
                 fontSize: 16,
                 fontWeight: 700,
-                color: '#0f172a',
-                background: '#f8fafc'
+                color: 'var(--il-text)',
+                background: 'var(--il-hover-bg)'
               }}>
                 {pendingRequest
                   ? `${Number(pendingRequest?.amount || 0).toLocaleString()} ${currency}`
@@ -244,7 +246,7 @@ export default function Transactions() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--il-text)', marginBottom: 8 }}>
                 Notes (optional)
               </label>
               <textarea
@@ -256,10 +258,12 @@ export default function Transactions() {
                   width: '100%',
                   padding: '14px 16px',
                   borderRadius: 12,
-                  border: '2px solid #e2e8f0',
+                  border: '1px solid var(--il-glass-border)',
                   fontSize: 14,
                   outline: 'none',
-                  resize: 'none'
+                  resize: 'none',
+                  color: 'var(--il-text)',
+                  background: 'var(--il-hover-bg)'
                 }}
               />
             </div>
@@ -271,9 +275,9 @@ export default function Transactions() {
                   flex: 1,
                   padding: '14px 20px',
                   borderRadius: 12,
-                  border: '2px solid #e2e8f0',
-                  background: 'white',
-                  color: '#64748b',
+                  border: '1px solid var(--il-glass-border)',
+                  background: 'transparent',
+                  color: 'var(--il-text-muted)',
                   fontWeight: 600,
                   fontSize: 15,
                   cursor: 'pointer'
