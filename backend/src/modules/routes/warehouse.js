@@ -396,7 +396,10 @@ router.get('/stock-history/:productId', auth, allowRoles('admin','user','manager
       return res.status(400).json({ message: 'Invalid product ID' })
     }
 
-    const product = await Product.findById(productId).select('stockHistory createdBy').lean()
+    const product = await Product.findById(productId)
+      .select('stockHistory createdBy')
+      .populate('stockHistory.addedBy', 'firstName lastName email')
+      .lean()
     
     if (!product) {
       return res.status(404).json({ message: 'Product not found' })
@@ -425,7 +428,7 @@ router.get('/stock-history/:productId', auth, allowRoles('admin','user','manager
       country: entry.country,
       quantity: entry.quantity,
       notes: entry.notes || '',
-      addedBy: entry.addedBy
+      addedBy: entry.addedBy || null
     })).sort((a, b) => new Date(b.date) - new Date(a.date))
 
     res.json({ history })
