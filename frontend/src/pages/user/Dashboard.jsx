@@ -428,6 +428,7 @@ export default function Dashboard() {
   const loadAbortRef = useRef(null)
   const monthDebounceRef = useRef(null)
   const reloadTimerRef = useRef(null)
+  const lastRealtimeReloadRef = useRef(0)
 
   const cacheKey = (type, params) => `dashboard_${type}_${params}`
   const cacheGet = (type, params) => { try { const c = sessionStorage.getItem(cacheKey(type, params)); return c ? JSON.parse(c) : null } catch { return null } }
@@ -613,8 +614,14 @@ export default function Dashboard() {
         withCredentials: true,
       })
       const reload = () => {
+        try {
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+        } catch {}
+        const now = Date.now()
+        if (now - (lastRealtimeReloadRef.current || 0) < 4000) return
+        lastRealtimeReloadRef.current = now
         if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
-        reloadTimerRef.current = setTimeout(load, 450)
+        reloadTimerRef.current = setTimeout(load, 1200)
       }
       socket.on('orders.changed', reload); socket.on('reports.userMetrics.updated', reload)
     } catch {}

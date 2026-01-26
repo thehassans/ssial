@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 export default function Chart({ analytics }) {
   const [hoveredIndex, setHoveredIndex] = useState(null)
@@ -6,7 +6,17 @@ export default function Chart({ analytics }) {
   const [tooltipData, setTooltipData] = useState(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
-  const days = Array.isArray(analytics?.days) ? analytics.days : []
+  const days = useMemo(() => {
+    const src = Array.isArray(analytics?.days) ? analytics.days : []
+    const MAX_POINTS = 90
+    if (src.length <= MAX_POINTS) return src
+    const step = Math.max(1, Math.ceil(src.length / MAX_POINTS))
+    const sampled = []
+    for (let i = 0; i < src.length; i += step) sampled.push(src[i])
+    const last = src[src.length - 1]
+    if (sampled[sampled.length - 1] !== last) sampled.push(last)
+    return sampled
+  }, [analytics?.days])
   const MONTHS = [
     'Jan',
     'Feb',
@@ -21,17 +31,6 @@ export default function Chart({ analytics }) {
     'Nov',
     'Dec',
   ]
-
-  const parsed = days.map((d) => {
-    const s = String(d.day || '')
-    const [y, m, dd] = s.split('-').map(Number)
-    const full = isFinite(m) && isFinite(dd) ? `${MONTHS[m - 1]} ${dd}` : s
-    return { y, m, d: dd, full, raw: s }
-  })
-
-  const tickCount = Math.min(8, Math.max(2, parsed.length))
-  const interval = Math.max(1, Math.ceil(parsed.length / tickCount))
-  const labelFlags = parsed.map((_, i) => i % interval === 0 || i === parsed.length - 1)
 
   const seriesKeys = ['UAE', 'Oman', 'KSA', 'Bahrain', 'India', 'Kuwait', 'Qatar', 'Pakistan', 'Jordan', 'USA', 'UK', 'Canada', 'Australia']
   const colors = {
@@ -102,17 +101,37 @@ export default function Chart({ analytics }) {
     },
   }
 
-  const dataByKey = Object.fromEntries(
-    seriesKeys.map((k) => [k, days.map((d) => Number(d[k] || 0))])
-  )
-  const allValues = seriesKeys.flatMap((k) => dataByKey[k])
+  const memo = useMemo(() => {
+    const parsed = days.map((d) => {
+      const s = String(d.day || '')
+      const [y, m, dd] = s.split('-').map(Number)
+      const full = isFinite(m) && isFinite(dd) ? `${MONTHS[m - 1]} ${dd}` : s
+      return { y, m, d: dd, full, raw: s }
+    })
+
+    const tickCount = Math.min(8, Math.max(2, parsed.length))
+    const interval = Math.max(1, Math.ceil(parsed.length / tickCount))
+    const labelFlags = parsed.map((_, i) => i % interval === 0 || i === parsed.length - 1)
+
+    const dataByKey = Object.fromEntries(
+      seriesKeys.map((k) => [k, days.map((d) => Number(d[k] || 0))])
+    )
+    const allValues = seriesKeys.flatMap((k) => dataByKey[k])
+
+    return { parsed, labelFlags, dataByKey, allValues }
+  }, [days])
+
+  const parsed = memo.parsed
+  const labelFlags = memo.labelFlags
+  const dataByKey = memo.dataByKey
+  const allValues = memo.allValues
 
   // Filter to show only selected country if one is chosen
   const visibleKeys = selectedCountry ? [selectedCountry] : seriesKeys
 
   const padding = 60
   const height = 400
-  const width = Math.min(1400, Math.max(700, padding * 2 + parsed.length * 50))
+  const width = Math.min(1600, Math.max(700, padding * 2 + parsed.length * 40))
   const max = Math.max(1, ...allValues) * 1.15
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((p) => Math.round(p * max))
 
