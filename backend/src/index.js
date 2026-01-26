@@ -242,12 +242,21 @@ try {
     ...(process.env.FRONTEND_DIST
       ? [path.resolve(process.env.FRONTEND_DIST)]
       : []),
+    // Plesk recommended layout: put built frontend assets directly under backend/public
+    path.resolve(process.cwd(), "public"),
+    path.resolve(__dirname, "../public"),
+    path.resolve("/httpdocs/backend/public"),
+    path.resolve("/httpdocs/public"),
     path.resolve(process.cwd(), "../frontend/dist"),
     path.resolve(process.cwd(), "frontend/dist"),
     path.resolve(__dirname, "../../frontend/dist"),
+    path.resolve(process.cwd(), "../frontend/build"),
+    path.resolve(process.cwd(), "frontend/build"),
+    path.resolve(__dirname, "../../frontend/build"),
     // Plesk typical docroot layout: if app root is /httpdocs/backend, this is redundant with ../frontend/dist
     // but we include it for clarity/explicitness
     path.resolve("/httpdocs/frontend/dist"),
+    path.resolve("/httpdocs/frontend/build"),
   ];
   for (const c of candidates) {
     try {
