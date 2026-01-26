@@ -24,13 +24,8 @@ class SocketManager {
     const upgradeTimeout = Number(process.env.SOCKET_IO_UPGRADE_TIMEOUT || 10000);
     const pathOpt = String(process.env.SOCKET_IO_PATH || '/socket.io');
 
-    // Plesk often proxies polling but blocks websocket upgrades unless explicitly enabled.
-    // Default production to polling-only to prevent reconnect storms and UI freezes.
     const enableWebsocket = String(process.env.ENABLE_WEBSOCKET || '').toLowerCase() === 'true';
-    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-    const transports = isProd
-      ? (enableWebsocket ? ['websocket', 'polling'] : ['polling'])
-      : ['websocket', 'polling'];
+    const transports = enableWebsocket ? ['websocket', 'polling'] : ['polling'];
 
     this.io = new Server(server, {
       cors: corsOpts,

@@ -15,6 +15,7 @@ export default function LiveNumber({
   const [highlight, setHighlight] = useState(null) // 'up' | 'down' | null
   const rafRef = useRef(null)
   const highlightTimerRef = useRef(null)
+  const lastPaintRef = useRef(0)
   const startRef = useRef({ from: Number(value) || 0, to: Number(value) || 0, t0: 0 })
   const prevRef = useRef(Number(value) || 0)
 
@@ -22,6 +23,14 @@ export default function LiveNumber({
     const to = Number(value) || 0
     const from = display
     if (from === to) return
+
+    try {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        setDisplay(to)
+        prevRef.current = to
+        return
+      }
+    } catch {}
 
     // Determine direction for highlight
     const diff = to - prevRef.current
@@ -43,7 +52,10 @@ export default function LiveNumber({
       const eased = 1 - Math.pow(1 - p, 4)
 
       const v = from + (to - from) * eased
-      setDisplay(v)
+      if (!lastPaintRef.current || t - lastPaintRef.current > 33) {
+        lastPaintRef.current = t
+        setDisplay(v)
+      }
 
       if (p < 1) {
         rafRef.current = requestAnimationFrame(step)

@@ -8,9 +8,7 @@ function normalizeIds(value) {
       let s = typeof v === 'string' ? v : ''
       s = String(s || '').trim()
       if (!s) return ''
-      // Strip any HTML tags / script fragments
       s = s.replace(/<[^>]*>/g, ' ').trim()
-      // Extract the most plausible ID token (alphanumeric)
       const parts = s.match(/[A-Za-z0-9]{6,64}/g) || []
       if (!parts.length) return ''
       parts.sort((a, b) => b.length - a.length)

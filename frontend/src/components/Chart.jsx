@@ -116,18 +116,24 @@ export default function Chart({ analytics }) {
     const dataByKey = Object.fromEntries(
       seriesKeys.map((k) => [k, days.map((d) => Number(d[k] || 0))])
     )
-    const allValues = seriesKeys.flatMap((k) => dataByKey[k])
+    const totalsByKey = Object.fromEntries(
+      seriesKeys.map((k) => [k, (dataByKey[k] || []).reduce((sum, v) => sum + Number(v || 0), 0)])
+    )
+    const activeKeys = seriesKeys.filter((k) => (totalsByKey[k] || 0) > 0)
+    const finalKeys = activeKeys.length ? activeKeys : seriesKeys.slice(0, 4)
+    const allValues = finalKeys.flatMap((k) => dataByKey[k])
 
-    return { parsed, labelFlags, dataByKey, allValues }
+    return { parsed, labelFlags, dataByKey, allValues, totalsByKey, finalKeys }
   }, [days])
 
   const parsed = memo.parsed
   const labelFlags = memo.labelFlags
   const dataByKey = memo.dataByKey
   const allValues = memo.allValues
+  const finalKeys = memo.finalKeys
 
   // Filter to show only selected country if one is chosen
-  const visibleKeys = selectedCountry ? [selectedCountry] : seriesKeys
+  const visibleKeys = selectedCountry ? [selectedCountry] : finalKeys
 
   const padding = 60
   const height = 400

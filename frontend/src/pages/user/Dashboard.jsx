@@ -599,30 +599,32 @@ export default function Dashboard() {
   useEffect(() => {
     let socket
     try {
-      const token = localStorage.getItem('token') || ''
-      if (!token) return
-      socket = io(API_BASE || undefined, {
-        path: '/socket.io',
-        transports: ['polling'],
-        upgrade: false,
-        timeout: 8000,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 800,
-        reconnectionDelayMax: 4000,
-        auth: { token },
-        withCredentials: true,
-      })
-      const reload = () => {
-        try {
-          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-        } catch {}
-        const now = Date.now()
-        if (now - (lastRealtimeReloadRef.current || 0) < 4000) return
-        lastRealtimeReloadRef.current = now
-        if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
-        reloadTimerRef.current = setTimeout(load, 1200)
+      if (import.meta.env.DEV) {
+        const token = localStorage.getItem('token') || ''
+        if (!token) return
+        socket = io(API_BASE || undefined, {
+          path: '/socket.io',
+          transports: ['polling'],
+          upgrade: false,
+          timeout: 8000,
+          reconnectionAttempts: 2,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 2000,
+          auth: { token },
+          withCredentials: true,
+        })
+        const reload = () => {
+          try {
+            if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+          } catch {}
+          const now = Date.now()
+          if (now - (lastRealtimeReloadRef.current || 0) < 4000) return
+          lastRealtimeReloadRef.current = now
+          if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
+          reloadTimerRef.current = setTimeout(load, 1200)
+        }
+        socket.on('orders.changed', reload); socket.on('reports.userMetrics.updated', reload)
       }
-      socket.on('orders.changed', reload); socket.on('reports.userMetrics.updated', reload)
     } catch {}
     return () => {
       try {

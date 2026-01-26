@@ -41,26 +41,27 @@ export default function UserLayout() {
     }
     loadPending()
 
-    // Live updates for manager remittances
     let socket
     try {
-      const token = localStorage.getItem('token') || ''
-      if (token) {
-        socket = io(API_BASE || undefined, {
-          path: '/socket.io',
-          transports: ['polling'],
-          upgrade: false,
-          timeout: 8000,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 800,
-          reconnectionDelayMax: 4000,
-          withCredentials: true,
-          auth: { token },
-        })
+      if (import.meta.env.DEV) {
+        const token = localStorage.getItem('token') || ''
+        if (token) {
+          socket = io(API_BASE || undefined, {
+            path: '/socket.io',
+            transports: ['polling'],
+            upgrade: false,
+            timeout: 8000,
+            reconnectionAttempts: 2,
+            reconnectionDelay: 800,
+            reconnectionDelayMax: 2000,
+            withCredentials: true,
+            auth: { token },
+          })
+          socket.on('manager-remittance.created', loadPending)
+          socket.on('manager-remittance.accepted', loadPending)
+          socket.on('manager-remittance.rejected', loadPending)
+        }
       }
-      socket.on('manager-remittance.created', loadPending)
-      socket.on('manager-remittance.accepted', loadPending)
-      socket.on('manager-remittance.rejected', loadPending)
     } catch {}
 
     return () => {
