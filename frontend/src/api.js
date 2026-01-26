@@ -166,11 +166,16 @@ function toastInfo(_message) {
 }
 
 // Lightweight persistent error log in localStorage
+const __errorLogCooldown = new Map()
 function appendErrorLog(entry) {
   try {
     const key = 'error_logs'
-    const prev = JSON.parse(localStorage.getItem(key) || '[]')
     const now = Date.now()
+    const sig = `${entry?.url || ''}|${entry?.status || ''}|${entry?.message || ''}`
+    const last = __errorLogCooldown.get(sig) || 0
+    if (last && now - last < 1500) return
+    __errorLogCooldown.set(sig, now)
+    const prev = JSON.parse(localStorage.getItem(key) || '[]')
     const item = { ts: now, ...entry }
     const next = [item, ...prev].slice(0, 200) // cap to last 200
     localStorage.setItem(key, JSON.stringify(next))
@@ -181,10 +186,12 @@ async function handle(res) {
   if (res.ok) return res
   // Centralize auth failures: clear token and redirect to login
   // But ONLY for protected areas, not public e-commerce pages
-  if (res.status === 401) {
+  if (res.status === 401 || res.status === 403) {
     try {
-      localStorage.removeItem('token')
-      localStorage.removeItem('me')
+      if (res.status === 401) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('me')
+      }
     } catch {}
     // Determine which login page to redirect to
     const path = location.pathname || ''
@@ -569,6 +576,7 @@ async function fetchWithRetry(url, init, opts) {
   const isMsgs = urlStr.includes('/api/wa/messages')
   const isChats = urlStr.includes('/api/wa/chats')
   const maxRetries = retryable ? (isMsgs || isChats ? 0 : 3) : 0
+  const timeoutMs = Number((opts && opts.timeoutMs) || 12000)
   let attempt = 0
   let delay = 400
   while (true) {
@@ -594,7 +602,37 @@ async function fetchWithRetry(url, init, opts) {
         }
       } catch {}
     }
-    const res = await fetch(url, init)
+    const controller = new AbortController()
+    const timer = setTimeout(
+      () => {
+        try {
+          controller.abort()
+        } catch {}
+      },
+      Math.max(1000, timeoutMs)
+    )
+    let abortListener = null
+    try {
+      if (init && init.signal && typeof init.signal.addEventListener === 'function') {
+        abortListener = () => {
+          try {
+            controller.abort()
+          } catch {}
+        }
+        init.signal.addEventListener('abort', abortListener)
+      }
+    } catch {}
+    let res
+    try {
+      res = await fetch(url, { ...(init || {}), signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+      try {
+        if (abortListener && init && init.signal && typeof init.signal.removeEventListener === 'function') {
+          init.signal.removeEventListener('abort', abortListener)
+        }
+      } catch {}
+    }
     // If 429 on WA endpoints, set per-route cooldown even if we won't retry
     if (retryable && (isMsgs || isChats) && res.status === 429) {
       let waitMs = delay

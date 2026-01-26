@@ -97,8 +97,27 @@ const corsOptions = {
     // Android: http://localhost, https://localhost
     // iOS: capacitor://localhost
     const isMobileOrigin = origin.startsWith('http://localhost') || origin.startsWith('https://localhost') || origin.startsWith('capacitor://');
-    
-    if (isWildcard || isListed || isMobileOrigin) return cb(null, true);
+
+    let hostAllowed = false;
+    try {
+      const o = new URL(origin);
+      const originHost = String(o.hostname || '').toLowerCase();
+      const allowedHosts = allowed
+        .map((a) => {
+          try {
+            return new URL(String(a)).hostname;
+          } catch {
+            return '';
+          }
+        })
+        .filter(Boolean)
+        .map((h) => String(h).toLowerCase());
+      hostAllowed = allowedHosts.some(
+        (h) => originHost === h || originHost === `www.${h}` || `www.${originHost}` === h
+      );
+    } catch {}
+
+    if (isWildcard || isListed || isMobileOrigin || hostAllowed) return cb(null, true);
     return cb(new Error("Not allowed by CORS: " + origin));
   },
   credentials: true,
