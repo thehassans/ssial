@@ -14,6 +14,7 @@ export default function LiveNumber({
   const [delta, setDelta] = useState(0)
   const [highlight, setHighlight] = useState(null) // 'up' | 'down' | null
   const rafRef = useRef(null)
+  const highlightTimerRef = useRef(null)
   const startRef = useRef({ from: Number(value) || 0, to: Number(value) || 0, t0: 0 })
   const prevRef = useRef(Number(value) || 0)
 
@@ -28,7 +29,8 @@ export default function LiveNumber({
       setDelta(diff)
       setHighlight(diff > 0 ? 'up' : 'down')
       // Reset highlight after animation
-      setTimeout(() => setHighlight(null), duration + 200)
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+      highlightTimerRef.current = setTimeout(() => setHighlight(null), duration + 200)
     }
 
     startRef.current = { from, to, t0: performance.now() }
@@ -56,6 +58,7 @@ export default function LiveNumber({
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
     }
   }, [value, duration])
 

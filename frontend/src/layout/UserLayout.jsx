@@ -45,13 +45,20 @@ export default function UserLayout() {
     let socket
     try {
       const token = localStorage.getItem('token') || ''
-      socket = io(API_BASE || undefined, {
-        path: '/socket.io',
-        transports: ['polling'],
-        upgrade: false,
-        withCredentials: true,
-        auth: { token },
-      })
+      if (token) {
+        socket = io(API_BASE || undefined, {
+          path: '/socket.io',
+          transports: ['websocket', 'polling'],
+          upgrade: true,
+          rememberUpgrade: true,
+          timeout: 8000,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 4000,
+          withCredentials: true,
+          auth: { token },
+        })
+      }
       socket.on('manager-remittance.created', loadPending)
       socket.on('manager-remittance.accepted', loadPending)
       socket.on('manager-remittance.rejected', loadPending)

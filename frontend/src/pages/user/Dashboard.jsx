@@ -598,14 +598,32 @@ export default function Dashboard() {
   useEffect(() => {
     let socket
     try {
+      const token = localStorage.getItem('token') || ''
+      if (!token) return
       socket = io(API_BASE || undefined, {
-        path: '/socket.io', transports: ['polling'], upgrade: false,
-        auth: { token: localStorage.getItem('token') || '' }, withCredentials: true
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        rememberUpgrade: true,
+        timeout: 8000,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 800,
+        reconnectionDelayMax: 4000,
+        auth: { token },
+        withCredentials: true,
       })
-      const reload = () => { if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current); reloadTimerRef.current = setTimeout(load, 450) }
+      const reload = () => {
+        if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
+        reloadTimerRef.current = setTimeout(load, 450)
+      }
       socket.on('orders.changed', reload); socket.on('reports.userMetrics.updated', reload)
     } catch {}
-    return () => { try { socket?.disconnect() } catch {} }
+    return () => {
+      try {
+        if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
+      } catch {}
+      try { socket?.disconnect() } catch {}
+    }
   }, [])
 
   const currentYear = new Date().getFullYear()
