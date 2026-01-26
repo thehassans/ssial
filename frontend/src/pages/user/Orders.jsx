@@ -765,39 +765,45 @@ export default function UserOrders() {
   useEffect(() => {
     let socket
     try {
-      const token = localStorage.getItem('token') || ''
-      socket = io(API_BASE || undefined, {
-        path: '/socket.io',
-        transports: ['polling'],
-        upgrade: false,
-        withCredentials: true,
-        auth: { token },
-      })
-      socket.on('orders.changed', async (evt) => {
-        try {
-          const id = evt?.orderId
-          if (!id) return
-          const r = await apiGet(`/api/orders/view/${id}`)
-          const ord = r?.order
-          if (ord) {
-            await preserveScroll(async () => {
-              setOrders((prev) => {
-                const idx = prev.findIndex((o) => String(o._id) === String(id))
-                if (idx === -1) return prev
-                const copy = [...prev]
-                copy[idx] = ord
-                return copy
+      if (import.meta.env.DEV) {
+        const token = localStorage.getItem('token') || ''
+        if (!token) return
+        socket = io(API_BASE || undefined, {
+          path: '/socket.io',
+          transports: ['polling'],
+          upgrade: false,
+          withCredentials: true,
+          timeout: 8000,
+          reconnectionAttempts: 2,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 2000,
+          auth: { token },
+        })
+        socket.on('orders.changed', async (evt) => {
+          try {
+            const id = evt?.orderId
+            if (!id) return
+            const r = await apiGet(`/api/orders/view/${id}`)
+            const ord = r?.order
+            if (ord) {
+              await preserveScroll(async () => {
+                setOrders((prev) => {
+                  const idx = prev.findIndex((o) => String(o._id) === String(id))
+                  if (idx === -1) return prev
+                  const copy = [...prev]
+                  copy[idx] = ord
+                  return copy
+                })
               })
-            })
-          }
-        } catch {}
-      })
-      // Clear driver cache when driver is updated so new commission is fetched
-      socket.on('driver.updated', (evt) => {
-        try {
-          setDriversByCountry({}) // Clear cache to force refresh
-        } catch {}
-      })
+            }
+          } catch {}
+        })
+        socket.on('driver.updated', (evt) => {
+          try {
+            setDriversByCountry({})
+          } catch {}
+        })
+      }
     } catch {}
     return () => {
       try {
