@@ -48,9 +48,8 @@ export default function UserLayout() {
       if (token) {
         socket = io(API_BASE || undefined, {
           path: '/socket.io',
-          transports: ['websocket', 'polling'],
-          upgrade: true,
-          rememberUpgrade: true,
+          transports: ['polling'],
+          upgrade: false,
           timeout: 8000,
           reconnectionAttempts: 5,
           reconnectionDelay: 800,

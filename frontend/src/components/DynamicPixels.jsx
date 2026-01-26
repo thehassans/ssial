@@ -3,15 +3,33 @@ import { useLocation } from 'react-router-dom'
 import { apiGet } from '../api.js'
 
 function normalizeIds(value) {
+  const sanitizeOne = (v) => {
+    try {
+      let s = typeof v === 'string' ? v : ''
+      s = String(s || '').trim()
+      if (!s) return ''
+      // Strip any HTML tags / script fragments
+      s = s.replace(/<[^>]*>/g, ' ').trim()
+      // Extract the most plausible ID token (alphanumeric)
+      const parts = s.match(/[A-Za-z0-9]{6,64}/g) || []
+      if (!parts.length) return ''
+      parts.sort((a, b) => b.length - a.length)
+      const best = String(parts[0] || '').trim()
+      if (!best) return ''
+      return best
+    } catch {
+      return ''
+    }
+  }
   if (Array.isArray(value)) {
     return value
-      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .map((v) => sanitizeOne(v))
       .filter(Boolean)
   }
   if (typeof value !== 'string') return []
   const raw = value
     .split(/[\n,]+/g)
-    .map((v) => String(v || '').trim())
+    .map((v) => sanitizeOne(v))
     .filter(Boolean)
   return Array.from(new Set(raw))
 }
@@ -271,7 +289,7 @@ function ensureTikTokBaseLoaded() {
       var i = document.createElement("script")
       i.type = "text/javascript"
       i.async = true
-      i.src = r + "?sdkid=" + e + "&lib=" + t
+      i.src = r + "?sdkid=" + encodeURIComponent(e) + "&lib=" + t
       var a = document.getElementsByTagName("script")[0]
       a.parentNode.insertBefore(i, a)
     }
@@ -284,7 +302,17 @@ function initTikTokPixels(pixelIds) {
 
   const pageViewEnabled = (window._tiktokEvents || {}).pageView !== false
 
-  pixelIds.forEach((id) => {
+  const safeIds = Array.from(
+    new Set(
+      (Array.isArray(pixelIds) ? pixelIds : [])
+        .map((x) => String(x || '').trim())
+        .filter((x) => /^[A-Za-z0-9]{6,64}$/.test(x))
+    )
+  )
+
+  if (!safeIds.length) return
+
+  safeIds.forEach((id) => {
     try {
       window.ttq.load(id)
       if (pageViewEnabled && typeof window.ttq.instance === 'function') {
@@ -301,7 +329,7 @@ function initTikTokPixels(pixelIds) {
     } catch {}
   }
 
-  console.log('TikTok Pixel initialized:', pixelIds)
+  console.log('TikTok Pixel initialized:', safeIds)
 }
 
 // Facebook/Meta Pixel initialization
