@@ -146,16 +146,17 @@ router.get('/public/categories-usage', async (req, res) => {
 // Public: return list of countries that have products available
 router.get('/public/available-countries', async (req, res) => {
   try {
-    const products = await Product.find({ displayOnWebsite: true }).select('availableCountries').lean()
-    const countrySet = new Set()
-    for (const p of products) {
-      if (Array.isArray(p.availableCountries)) {
-        p.availableCountries.forEach(c => countrySet.add(c))
-      }
-    }
-    // If no products have availableCountries set, return default countries
-    const countries = countrySet.size > 0 
-      ? Array.from(countrySet).sort() 
+    const rows = await Product.aggregate([
+      { $match: { displayOnWebsite: true } },
+      { $project: { availableCountries: 1 } },
+      { $unwind: { path: '$availableCountries', preserveNullAndEmptyArrays: true } },
+      { $match: { availableCountries: { $type: 'string' } } },
+      { $group: { _id: null, countries: { $addToSet: '$availableCountries' } } },
+      { $project: { _id: 0, countries: 1 } },
+    ])
+    const out = Array.isArray(rows) && rows.length ? (rows[0].countries || []) : []
+    const countries = out.length > 0
+      ? out.sort()
       : ['KSA', 'UAE', 'Oman', 'Bahrain', 'Kuwait', 'Qatar', 'India', 'Pakistan', 'Jordan', 'USA', 'UK', 'Canada', 'Australia']
     return res.json({ countries })
   } catch (err) {
@@ -424,6 +425,9 @@ router.get('/public', async (req, res) => {
         case 'trending':
           query.isTrending = true
           break
+        case 'sale':
+          query.salePrice = { $gt: 0 }
+          break
       }
     }
     
@@ -475,32 +479,20 @@ router.get('/public', async (req, res) => {
     }
     
     const pageNum = Math.max(1, parseInt(page))
-    const limitNum = Math.min(10000, Math.max(1, parseInt(limit)))
+    const limitNum = Math.min(60, Math.max(1, parseInt(limit)))
     const skip = (pageNum - 1) * limitNum
-    
+
     const products = await Product.find(query)
       .sort(sortObj)
       .skip(skip)
       .limit(limitNum)
-      .select('-createdBy -updatedAt -__v')
-    
-    // Ensure totalPurchased is set for all products
-    const productsWithTotal = products.map(p => {
-      const prod = p.toObject()
-      if (prod.totalPurchased == null || prod.totalPurchased === 0) {
-        let totalFromHistory = 0
-        if (Array.isArray(prod.stockHistory) && prod.stockHistory.length > 0) {
-          totalFromHistory = prod.stockHistory.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0)
-        }
-        prod.totalPurchased = totalFromHistory > 0 ? totalFromHistory : (prod.stockQty || 0)
-      }
-      return prod
-    })
+      .select('name price salePrice baseCurrency imagePath images video category brand rating reviewCount featured isFeatured isTrending isBestSelling displayOnWebsite createdAt')
+      .lean()
     
     const total = await Product.countDocuments(query)
     
     res.json({
-      products: productsWithTotal,
+      products,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -603,7 +595,7 @@ router.get('/mobile', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Mobile products error:', error)
+    console.error('Public products error:', error)
     res.status(500).json({ message: 'Failed to fetch products' })
   }
 })

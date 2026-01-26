@@ -280,6 +280,7 @@ export default function ProductCatalog() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const loaderRef = useRef(null)
+  const pageLimit = 48
 
   // Load category usage counts (public)
   useEffect(() => {
@@ -423,19 +424,14 @@ export default function ProductCatalog() {
   useEffect(() => {
     setCurrentPage(1)
     setHasMore(true)
+    setProducts([])
+    setDisplayedProducts([])
   }, [selectedCategory, searchQuery, sortBy, filterType])
 
   // Update displayed products when products load
   useEffect(() => {
-    if (products.length > 0) {
-      const endIndex = currentPage * productsPerPage
-      setDisplayedProducts(products.slice(0, endIndex))
-      setHasMore(endIndex < products.length)
-    } else {
-      setDisplayedProducts([])
-      setHasMore(false)
-    }
-  }, [products, currentPage])
+    setDisplayedProducts(Array.isArray(products) ? products : [])
+  }, [products])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -443,15 +439,58 @@ export default function ProductCatalog() {
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loadingMore && !isFetching && !initialLoading) {
           setLoadingMore(true)
-          setCurrentPage(prev => prev + 1)
-          setTimeout(() => setLoadingMore(false), 300)
+          loadMoreProducts().finally(() => {
+            try { setLoadingMore(false) } catch {}
+          })
         }
       },
       { threshold: 0.1 }
     )
     if (loaderRef.current) observer.observe(loaderRef.current)
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, isFetching, initialLoading])
+  }, [hasMore, loadingMore, isFetching, initialLoading, currentPage, selectedCategory, searchQuery, sortBy, filterType])
+
+  const loadMoreProducts = useCallback(async () => {
+    if (isFetching) return
+    if (!hasMore) return
+    const nextPage = Number(currentPage || 1) + 1
+    try {
+      setIsFetching(true)
+      const reqId = ++productsReqIdRef.current
+
+      const params = new URLSearchParams()
+      if (selectedCategory !== 'all') params.append('category', selectedCategory)
+      if (searchQuery.trim()) params.append('search', searchQuery.trim())
+      if (sortBy) params.append('sort', sortBy)
+      if (filterType) {
+        const f = String(filterType || '')
+        const mapped = f === 'bestselling' ? 'bestSelling' : f
+        params.append('filter', mapped)
+      }
+      params.append('page', String(nextPage))
+      params.append('limit', String(pageLimit))
+
+      const response = await apiGet(`/api/products/public?${params.toString()}`)
+      if (reqId !== productsReqIdRef.current) return
+      const list = Array.isArray(response?.products) ? response.products : []
+      const pag = response?.pagination || null
+      setProducts((prev) => {
+        const p = Array.isArray(prev) ? prev : []
+        return [...p, ...list]
+      })
+      if (pag) setPagination(pag)
+      else setPagination((prev) => prev || { page: nextPage, pages: nextPage, total: 0 })
+      setCurrentPage(pag?.page || nextPage)
+      const pages = Number(pag?.pages || 0)
+      const page = Number(pag?.page || nextPage)
+      setHasMore(pages ? page < pages : list.length >= pageLimit)
+    } catch (error) {
+      console.error('Failed to load more products:', error)
+      setHasMore(false)
+    } finally {
+      setIsFetching(false)
+    }
+  }, [currentPage, selectedCategory, searchQuery, sortBy, filterType, pageLimit, hasMore, isFetching])
 
   const loadProducts = async () => {
     try {
@@ -472,33 +511,23 @@ export default function ProductCatalog() {
       if (selectedCategory !== 'all') params.append('category', selectedCategory)
       if (searchQuery.trim()) params.append('search', searchQuery.trim())
       if (sortBy) params.append('sort', sortBy)
-      if (filterType) params.append('filter', filterType)
+      if (filterType) {
+        const f = String(filterType || '')
+        const mapped = f === 'bestselling' ? 'bestSelling' : f
+        params.append('filter', mapped)
+      }
       params.append('page', '1')
-      params.append('limit', '10000') // Load all products for unlimited scrolling
+      params.append('limit', String(pageLimit)) // Load all products for unlimited scrolling
       
       const response = await apiGet(`/api/products/public?${params.toString()}`, { signal: controller.signal })
       if (reqId !== productsReqIdRef.current) return
       if (response?.products) {
-        // Show all products - no country filtering, only currency conversion
-        let filteredProducts = response.products
-        
-        // Apply special filters (bestselling, featured)
-        if (filterType === 'bestselling') {
-          filteredProducts = filteredProducts.filter(p => p.isBestSelling)
-        } else if (filterType === 'featured') {
-          filteredProducts = filteredProducts.filter(p => p.isFeatured || p.featured)
-        } else if (filterType === 'sale') {
-          filteredProducts = filteredProducts.filter(p => p.salePrice > 0 && p.salePrice < p.price)
-        }
-        
-        setProducts(filteredProducts)
-        // Update pagination to reflect filtered results
-        const filteredPagination = {
-          ...response.pagination,
-          total: filteredProducts.length,
-          pages: Math.ceil(filteredProducts.length / 12)
-        }
-        setPagination(filteredPagination)
+        const list = Array.isArray(response.products) ? response.products : []
+        setProducts(list)
+        setPagination(response.pagination || { page: 1, pages: 1, total: list.length })
+        setCurrentPage(1)
+        const pages = Number(response?.pagination?.pages || 0)
+        setHasMore(pages ? 1 < pages : list.length >= pageLimit)
       }
     } catch (error) {
       if (error?.name === 'AbortError') return
