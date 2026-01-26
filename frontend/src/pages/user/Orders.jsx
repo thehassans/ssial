@@ -111,6 +111,7 @@ export default function UserOrders() {
   const [verifying, setVerifying] = useState(null)
   const [driversByCountry, setDriversByCountry] = useState({}) // Cache drivers by country
   const [updating, setUpdating] = useState({})
+  const [renderLimit, setRenderLimit] = useState(50)
   const [editingDriver, setEditingDriver] = useState({}) // Track edited driver per order
   const [editingStatus, setEditingStatus] = useState({}) // Track edited status per order
   const [editingCommission, setEditingCommission] = useState({}) // Track edited commission per order
@@ -217,6 +218,94 @@ export default function UserOrders() {
       return Array.isArray(orders) ? orders : []
     }
   }, [orders, country, shipFilter])
+
+  const visibleOrders = useMemo(() => {
+    const list = Array.isArray(renderedOrders) ? renderedOrders : []
+    const n = Math.max(1, Number(renderLimit || 0))
+    return list.slice(0, n)
+  }, [renderedOrders, renderLimit])
+
+  useEffect(() => {
+    setRenderLimit(50)
+  }, [country, shipFilter, statusFilter, query, city, onlyUnassigned, onlyAssigned, paymentFilter, collectedOnly, agentFilter, driverFilter, dropshipFilter, selectedMonth, selectedYear])
+
+  const costById = useMemo(() => {
+    const m = new Map()
+    const cfg = curCfg || {}
+    for (const o of Array.isArray(visibleOrders) ? visibleOrders : []) {
+      try {
+        const id = String(o?._id || o?.id || '')
+        if (!id) continue
+        const creatorRole = o?.createdBy?.role || ''
+        const isDropshipper = creatorRole === 'dropshipper'
+        const targetCode = orderCountryCurrency(o?.orderCountry)
+        const localCode = phoneCodeCurrency(o?.phoneCountryCode) || targetCode
+
+        let totalPurchasePrice = 0
+        let totalDropshipPrice = 0
+        let companyPurchaseCost = 0
+
+        if (o?.items && Array.isArray(o.items) && o.items.length > 0) {
+          let maxDropshipItem = null
+          let maxDropshipConv = 0
+          const itemsWithPrices = o.items.map((it) => {
+            const prodBaseCurrency = it?.productId?.baseCurrency
+              ? String(it.productId.baseCurrency).toUpperCase()
+              : 'SAR'
+            const dropshipRaw = Number(it?.productId?.dropshippingPrice || 0)
+            const purchaseRaw = Number(it?.productId?.purchasePrice || 0)
+            const dropshipConv = convert(dropshipRaw, prodBaseCurrency, targetCode, cfg)
+            const purchaseConv = convert(purchaseRaw, prodBaseCurrency, targetCode, cfg)
+            return { item: it, dropshipConv, purchaseConv }
+          })
+
+          for (const ip of itemsWithPrices) {
+            if (ip.dropshipConv > maxDropshipConv) {
+              maxDropshipConv = ip.dropshipConv
+              maxDropshipItem = ip.item
+            }
+          }
+
+          for (const ip of itemsWithPrices) {
+            const it = ip.item
+            const q = Math.max(1, Number(it?.quantity || 1))
+            companyPurchaseCost += ip.purchaseConv * q
+            if (isDropshipper && it === maxDropshipItem) {
+              totalDropshipPrice = ip.dropshipConv
+              totalPurchasePrice += ip.purchaseConv * (q - 1)
+            } else {
+              totalPurchasePrice += ip.purchaseConv * q
+            }
+          }
+        } else if (o?.productId) {
+          const q = Math.max(1, Number(o?.quantity || 1))
+          const purchaseRaw = Number(o.productId?.purchasePrice || 0)
+          const dropshipRaw = Number(o.productId?.dropshippingPrice || 0)
+          const prodBaseCurrency = o.productId?.baseCurrency
+            ? String(o.productId.baseCurrency).toUpperCase()
+            : 'SAR'
+          const purchaseConv = convert(purchaseRaw, prodBaseCurrency, targetCode, cfg)
+          const dropshipConv = convert(dropshipRaw, prodBaseCurrency, targetCode, cfg)
+          companyPurchaseCost += purchaseConv * q
+          if (isDropshipper) {
+            totalDropshipPrice = dropshipConv
+            totalPurchasePrice += purchaseConv * (q - 1)
+          } else {
+            totalPurchasePrice += purchaseConv * q
+          }
+        }
+
+        m.set(id, {
+          targetCode,
+          localCode,
+          totalPurchasePrice,
+          totalDropshipPrice,
+          companyPurchaseCost,
+        })
+      } catch {}
+    }
+    return m
+  }, [visibleOrders, curCfg])
   async function loadOptions(selectedCountry = '') {
     try {
       const qs = selectedCountry ? `?country=${encodeURIComponent(selectedCountry)}` : ''
@@ -663,6 +752,7 @@ export default function UserOrders() {
 
   // Infinite scroll observer
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     const el = endRef.current
     if (!el) return
     const obs = new IntersectionObserver(
@@ -681,7 +771,7 @@ export default function UserOrders() {
       } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endRef.current, hasMore, page, buildQuery])
+  }, [hasMore, page, buildQuery])
 
   // No totals footer now; compute nothing
 
@@ -757,9 +847,9 @@ export default function UserOrders() {
 
   // Load drivers for visible orders when orders change
   useEffect(() => {
-    const countries = [...new Set(renderedOrders.map((o) => o.orderCountry).filter(Boolean))]
+    const countries = [...new Set(visibleOrders.map((o) => o.orderCountry).filter(Boolean))]
     countries.forEach((country) => fetchDriversByCountry(country))
-  }, [renderedOrders])
+  }, [visibleOrders])
 
   // Live updates: patch single order in-place and preserve scroll, clear driver cache on driver updates
   useEffect(() => {
@@ -1442,7 +1532,7 @@ export default function UserOrders() {
             <div className="section">No orders found</div>
           </div>
         ) : (
-          renderedOrders.map((o) => {
+          visibleOrders.map((o) => {
             const id = String(o._id || o.id)
             const ordNo = o.invoiceNumber ? `#${o.invoiceNumber}` : shortId(id)
             const fromWebsite =
@@ -1459,75 +1549,12 @@ export default function UserOrders() {
                   : '-'
 
             // Define target currency first (needed for price conversions)
-            const targetCode = orderCountryCurrency(o.orderCountry)
-            const localCode = phoneCodeCurrency(o.phoneCountryCode) || targetCode
-
-            // Calculate purchase price and dropship price from products (with currency conversion)
-            // For dropshipper orders: 
-            //   - Dropship Price = cost for 1 most expensive product (what dropshipper pays)
-            //   - Purchase Price for extra units (what dropshipper pays for rest)
-            //   - Company cost = Purchase Price × ALL units
-            let totalPurchasePrice = 0      // Purchase price for extra units (dropshipper pays this)
-            let totalDropshipPrice = 0      // Dropship price for 1 unit (dropshipper pays this)
-            let companyPurchaseCost = 0     // Company's actual cost (purchase × ALL units)
-            
-            if (o.items && Array.isArray(o.items) && o.items.length > 0) {
-              // First, find the item with highest dropship price (converted)
-              let maxDropshipItem = null
-              let maxDropshipConv = 0
-              const itemsWithPrices = o.items.map(it => {
-                const prodBaseCurrency = it?.productId?.baseCurrency ? String(it.productId.baseCurrency).toUpperCase() : 'SAR'
-                const dropshipRaw = Number(it?.productId?.dropshippingPrice || 0)
-                const purchaseRaw = Number(it?.productId?.purchasePrice || 0)
-                const dropshipConv = convert(dropshipRaw, prodBaseCurrency, targetCode, curCfg)
-                const purchaseConv = convert(purchaseRaw, prodBaseCurrency, targetCode, curCfg)
-                return { item: it, dropshipConv, purchaseConv, prodBaseCurrency }
-              })
-              
-              // Find most expensive dropship item
-              for (const ip of itemsWithPrices) {
-                if (ip.dropshipConv > maxDropshipConv) {
-                  maxDropshipConv = ip.dropshipConv
-                  maxDropshipItem = ip.item
-                }
-              }
-              
-              // Calculate prices
-              for (const ip of itemsWithPrices) {
-                const it = ip.item
-                const q = Math.max(1, Number(it?.quantity || 1))
-                
-                // Company's cost = purchase price for ALL units
-                companyPurchaseCost += ip.purchaseConv * q
-                
-                if (isDropshipper && it === maxDropshipItem) {
-                  // Most expensive item: dropship price for 1, purchase for rest
-                  totalDropshipPrice = ip.dropshipConv
-                  totalPurchasePrice += ip.purchaseConv * (q - 1)
-                } else {
-                  // Other items: purchase price for all
-                  totalPurchasePrice += ip.purchaseConv * q
-                }
-              }
-            } else if (o.productId) {
-              const q = Math.max(1, Number(o?.quantity || 1))
-              const purchaseRaw = Number(o.productId?.purchasePrice || 0)
-              const dropshipRaw = Number(o.productId?.dropshippingPrice || 0)
-              const prodBaseCurrency = o.productId?.baseCurrency ? String(o.productId.baseCurrency).toUpperCase() : 'SAR'
-              const purchaseConv = convert(purchaseRaw, prodBaseCurrency, targetCode, curCfg)
-              const dropshipConv = convert(dropshipRaw, prodBaseCurrency, targetCode, curCfg)
-              
-              // Company's cost = purchase price for ALL units
-              companyPurchaseCost = purchaseConv * q
-              
-              if (isDropshipper) {
-                totalDropshipPrice = dropshipConv
-                totalPurchasePrice = purchaseConv * (q - 1)
-              } else {
-                totalPurchasePrice = purchaseConv * q
-                totalDropshipPrice = dropshipConv * q
-              }
-            }
+            const costInfo = costById.get(id) || null
+            const targetCode = costInfo?.targetCode || orderCountryCurrency(o.orderCountry)
+            const localCode = costInfo?.localCode || phoneCodeCurrency(o.phoneCountryCode) || targetCode
+            const totalPurchasePrice = Number(costInfo?.totalPurchasePrice || 0)
+            const totalDropshipPrice = Number(costInfo?.totalDropshipPrice || 0)
+            const companyPurchaseCost = Number(costInfo?.companyPurchaseCost || 0)
 
             // Product summary (supports multi-items)
             let productName = '-'
@@ -1727,17 +1754,18 @@ export default function UserOrders() {
                 <div
                   className="section"
                   style={{
+                    padding: '12px 16px',
+                    borderTop: '1px solid var(--border)',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                    gap: 10,
+                    gap: 16,
+                    alignItems: 'start',
                   }}
                 >
                   <div>
                     <div className="label">Customer</div>
                     <div style={{ fontWeight: 700 }}>{o.customerName || '-'}</div>
-                    <div className="helper">
-                      {`${o.phoneCountryCode || ''} ${o.customerPhone || ''}`.trim()}
-                    </div>
+                    <div className="helper">{o.customerPhone || '-'}</div>
                     <div
                       className="helper"
                       title={fullAddress}
@@ -1799,10 +1827,9 @@ export default function UserOrders() {
                       >
                         <option value="">-- Select Driver --</option>
                         {countryDrivers.map((d) => (
-                          <option
-                            key={String(d._id)}
-                            value={String(d._id)}
-                          >{`${d.firstName || ''} ${d.lastName || ''}${d.city ? ' • ' + d.city : ''}`}</option>
+                          <option key={String(d._id)} value={String(d._id)}>
+                            {`${d.firstName || ''} ${d.lastName || ''}${d.city ? ' • ' + d.city : ''}`}
+                          </option>
                         ))}
                       </select>
                       <div style={{ display: 'flex', gap: 8 }}>
@@ -2051,6 +2078,32 @@ export default function UserOrders() {
           })
         )}
       </div>
+
+      {!loading && !error && renderedOrders.length > visibleOrders.length && (
+        <div className="card">
+          <div className="section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div>
+              Showing {visibleOrders.length} of {renderedOrders.length}
+            </div>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => {
+                if (visibleOrders.length >= renderedOrders.length && hasMore) {
+                  try {
+                    loadOrders(false)
+                  } catch {}
+                }
+                setRenderLimit((n) =>
+                  Math.min(renderedOrders.length, (Number(n || 0) || 0) + 50)
+                )
+              }}
+            >
+              Load more
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Infinite Scroll Sentinel */}
       <div ref={endRef} />
